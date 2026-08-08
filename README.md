@@ -1,4 +1,5 @@
-<img src="https://files.catbox.moe/9vnula.webp" width="100%">
+<img src="https://files.catbox.moe/9vnula.webp" width="30%">
+
 
 # PRD — حصن المسلم (Hisn Al-Muslim)
 ### Product Requirements Document
