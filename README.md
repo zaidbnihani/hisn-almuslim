@@ -1,11 +1,13 @@
-<div align="center">
+# تطبيق حصن المسلم - أذكاري (Azkari)
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+تطبيق أندرويد إسلامي شامل مبني بلغة Kotlin و Jetpack Compose يحتوي على الأذكار، السبحة الإلكترونية، ومواقيت الصلاة الدقيقة مع الأذان.
 
-  <h1>Built with AI Studio</h2>
+## إعدادات البناء والتوقيع (Signing Config)
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+يستخدم مشروع أندرويد إعداد التوقيع الخاص بالتطوير (`debug`):
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+```kotlin
+signingConfig = signingConfigs.getByName("debug")
+```
 
-</div>
+تأكد من عدم تغيير اسم الإعداد إلى "debugConfig" لضمان توافق البناء مع إعدادات Gradle في `app/build.gradle.kts`.
