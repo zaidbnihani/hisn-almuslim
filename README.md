@@ -1,4 +1,7 @@
-<img src="https://files.catbox.moe/9vnula.webp" width="30%">
+<p align="center">
+  <img src="https://files.catbox.moe/9vnula.webp" width="30%">
+</p>
+
 
 
 # PRD — حصن المسلم (Hisn Al-Muslim)
