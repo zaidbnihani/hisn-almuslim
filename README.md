@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://files.catbox.moe/9vnula.webp" width="30%">
 </p>
-![تنزيلات التطبيق](https://shields.io) ![الإصدار الحالي](https://shields.io)
+
 
 
 
