@@ -2,6 +2,7 @@
   <img src="https://files.catbox.moe/9vnula.webp" width="30%">
 </p>
 
+![mit](https://shields.io)
 
 
 
