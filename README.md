@@ -1,6 +1,9 @@
 <p align="center">
   <img src="https://files.catbox.moe/9vnula.webp" width="30%">
 </p>
+[![GitHub Downloads](https://shields.io)](https://github.com/zaidbnihani/hisn-almuslim)
+
+
 
 
 
