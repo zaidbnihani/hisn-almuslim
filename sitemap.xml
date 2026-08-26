@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://zaidbnihani.github.io/hisn-almuslim/</loc>
+    <lastmod>2026-08-13</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    
+    <!-- Alternate Languages -->
+    <xhtml:link rel="alternate" hreflang="ar" href="https://zaidbnihani.github.io/hisn-almuslim/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zaidbnihani.github.io/hisn-almuslim/"/>
+
+    <!-- Images Metadata for Google Images SEO -->
+    <image:image>
+      <image:loc>https://zaidbnihani.github.io/hisn-almuslim/images/app_icon.webp</image:loc>
+      <image:title>أيقونة وشعار تطبيق حصن المسلم الرسمي</image:title>
+      <image:caption>تطبيق حصن المسلم للأذكار ومواقيت الصلاة مجاناً وبدون إعلانات</image:caption>
+    </image:image>
+
+    <image:image>
+      <image:loc>https://zaidbnihani.github.io/hisn-almuslim/images/feature_azkar.jpg</image:loc>
+      <image:title>أذكار الصباح والمساء مكتوبة ومسموعة - حصن المسلم</image:title>
+      <image:caption>عداد تفاعلي لأذكار الصباح والمساء في تطبيق حصن المسلم</image:caption>
+    </image:image>
+
+    <image:image>
+      <image:loc>https://zaidbnihani.github.io/hisn-almuslim/images/feature_prayer.jpg</image:loc>
+      <image:title>مواقيت الصلاة والأذان التلقائي الدقيق حسب الموقع</image:title>
+      <image:caption>حساب دقيق لمواقيت الصلاة وأصوات مؤذنين متعددين</image:caption>
+    </image:image>
+
+    <image:image>
+      <image:loc>https://zaidbnihani.github.io/hisn-almuslim/images/feature_tasbeeh.jpg</image:loc>
+      <image:title>السبحة الإلكترونية الذكية والتفاعلية</image:title>
+      <image:caption>عداد تسبيح ذكي وسلس مع حفظ التقدم اليومي تلقائياً</image:caption>
+    </image:image>
+
+    <image:image>
+      <image:loc>https://zaidbnihani.github.io/hisn-almuslim/images/feature_library.jpg</image:loc>
+      <image:title>مكتبة أدعية وأذكار حصن المسلم الشاملة</image:title>
+      <image:caption>مكتبة كاملة للأدعية المأثورة وأذكار المناسبات مع بحث سريع</image:caption>
+    </image:image>
+
+    <image:image>
+      <image:loc>https://zaidbnihani.github.io/hisn-almuslim/images/feature_radio.jpg</image:loc>
+      <image:title>إذاعة القرآن الكريم بث مباشر بالخلفية</image:title>
+      <image:caption>استماع مباشر لبث إذاعات القرآن الكريم بجودة عالية</image:caption>
+    </image:image>
+
+    <image:image>
+      <image:loc>https://zaidbnihani.github.io/hisn-almuslim/images/feature_calendar.jpg</image:loc>
+      <image:title>التقويم الهجري ومحول التواريخ الإسلامية</image:title>
+      <image:caption>أداة سريعة لتحويل التاريخ بين الهجري والميلادي لمتابعة المناسبات</image:caption>
+    </image:image>
+
+    <!-- Videos Metadata for Google Video Search Indexing -->
+    <video:video>
+      <video:thumbnail_loc>https://zaidbnihani.github.io/hisn-almuslim/images/feature_prayer.jpg</video:thumbnail_loc>
+      <video:title>العرض الترويجي الرسمي لتطبيق حصن المسلم</video:title>
+      <video:description>شاهد العرض الترويجي الرسمي لتطبيق حصن المسلم (الحصن / حسن المسلم)، أذكار الصباح والمساء ومواقيت الصلاة مجاناً وبدون إعلانات.</video:description>
+      <video:content_loc>https://zaidbnihani.github.io/hisn-almuslim/images/video_promo.mp4</video:content_loc>
+      <video:publication_date>2026-08-13T00:00:00+03:00</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+    </video:video>
+
+    <video:video>
+      <video:thumbnail_loc>https://zaidbnihani.github.io/hisn-almuslim/images/hero_ambient_mosque.jpg</video:thumbnail_loc>
+      <video:title>بث مباشر مكة المكرمة - المسجد الحرام</video:title>
+      <video:description>شاهد بث مكة المكرمة والمسجد الحرام المضيء داخل تطبيق حصن المسلم.</video:description>
+      <video:content_loc>https://zaidbnihani.github.io/hisn-almuslim/images/video_makkah.mp4</video:content_loc>
+      <video:publication_date>2026-08-13T00:00:00+03:00</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+    </video:video>
+
+    <video:video>
+      <video:thumbnail_loc>https://zaidbnihani.github.io/hisn-almuslim/images/feature_azkar.jpg</video:thumbnail_loc>
+      <video:title>الأذكار والتلاوات القرآنية الخاشعة المتحركة</video:title>
+      <video:description>استعرض الأذكار والتلاوات المكتوبة والمتحركة في تطبيق حصن المسلم.</video:description>
+      <video:content_loc>https://zaidbnihani.github.io/hisn-almuslim/images/video_recitation.mp4</video:content_loc>
+      <video:publication_date>2026-08-13T00:00:00+03:00</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+    </video:video>
+
+    <video:video>
+      <video:thumbnail_loc>https://zaidbnihani.github.io/hisn-almuslim/images/feature_tasbeeh.jpg</video:thumbnail_loc>
+      <video:title>شرح واستعراض كامل لتطبيق حصن المسلم APK</video:title>
+      <video:description>فيديو استعراض شامل لكافة مميزات تطبيق حصن المسلم والأذان التلقائي والسبحة الإلكترونية.</video:description>
+      <video:content_loc>https://zaidbnihani.github.io/hisn-almuslim/images/video_app_showcase.mp4</video:content_loc>
+      <video:publication_date>2026-08-13T00:00:00+03:00</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+    </video:video>
+  </url>
+</urlset>
