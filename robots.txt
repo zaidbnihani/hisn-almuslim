@@ -1,0 +1,97 @@
+# ==============================================================================
+# robots.txt — حصن المسلم | Hisn Al-Muslim Official Site
+# Full Optimization for Traditional Search Engines (SEO) & AI Engines (GEO)
+# ==============================================================================
+
+# Global Rules for all Crawlers
+User-agent: *
+Allow: /
+Allow: /images/
+Allow: /index.html
+Disallow: /*.json$
+Disallow: /*.tmp$
+
+# ------------------------------------------------------------------------------
+# Traditional Search Engine Crawlers (SEO)
+# ------------------------------------------------------------------------------
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /images/
+
+User-agent: Googlebot-Video
+Allow: /images/
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: YandexBot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+# ------------------------------------------------------------------------------
+# Generative AI & LLM Search Engine Crawlers (GEO / AI Search Optimization)
+# ------------------------------------------------------------------------------
+# OpenAI (ChatGPT / SearchGPT)
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+# Anthropic (Claude)
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+# Google Gemini & AI Overviews
+User-agent: Google-Extended
+Allow: /
+
+# Perplexity AI
+User-agent: PerplexityBot
+Allow: /
+
+# Apple Intelligence
+User-agent: Applebot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+# Meta AI
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: FacebookExternalHit
+Allow: /
+
+# Amazon / Cohere / ByteDance / Miscellaneous AI Crawlers
+User-agent: Amazonbot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+# ------------------------------------------------------------------------------
+# Host & Sitemap Directives
+# ------------------------------------------------------------------------------
+Host: https://zaidbnihani.github.io/hisn-almuslim/
+Sitemap: https://zaidbnihani.github.io/hisn-almuslim/sitemap.xml
