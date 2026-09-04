@@ -46,7 +46,8 @@ data class CityPreset(
     val lat: Double,
     val lon: Double,
     val tz: Double,
-    val method: String
+    val method: String,
+    val country: String = ""
 )
 
 data class CustomLocation(

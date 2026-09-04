@@ -1,10 +1,21 @@
 package com.example
 
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,6 +37,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
@@ -34,6 +51,7 @@ import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Radio
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,6 +60,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
@@ -56,6 +76,7 @@ import com.example.ui.screens.*
 import com.example.ui.theme.AthkarTheme
 import com.example.ui.theme.CardSurface
 import com.example.ui.theme.DarkCanvas
+import com.example.update.UpdateCheckerEffect
 import com.example.ui.theme.GoldBright
 import com.example.ui.theme.GoldPrimary
 import com.example.ui.theme.TextMuted
@@ -125,12 +146,35 @@ sealed class Screen(
     object Prayer : Screen("prayer", "المواقيت", Icons.Filled.DateRange, Icons.Outlined.DateRange)
     object Fortress : Screen("fortress", "الحصن", ShieldFilledVector, ShieldOutlinedVector)
     object Convert : Screen("convert", "التاريخ", Icons.Filled.DateRange, Icons.Outlined.DateRange)
+    object Radio : Screen("quran_radio", "إذاعة", Icons.Filled.Radio, Icons.Outlined.Radio)
     object Settings : Screen("settings", "الإعدادات", Icons.Filled.Settings, Icons.Outlined.Settings)
 }
 
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private var textToSpeech: android.speech.tts.TextToSpeech? = null
+
+    private fun speakText(text: String) {
+        if (textToSpeech == null) {
+            textToSpeech = android.speech.tts.TextToSpeech(this) { status ->
+                if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                    textToSpeech?.language = java.util.Locale("ar")
+                    textToSpeech?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
+                }
+            }
+        } else {
+            textToSpeech?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, null)
+        }
+    }
+
+    override fun onDestroy() {
+        try {
+            textToSpeech?.stop()
+            textToSpeech?.shutdown()
+        } catch (_: Exception) {}
+        super.onDestroy()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -140,59 +184,185 @@ class MainActivity : ComponentActivity() {
             AthkarTheme {
                 val uiState by viewModel.uiState.collectAsState()
                 val navController = rememberNavController()
+                
+                // Firebase Realtime Global Announcement Dialog
+                val activeBroadcast = uiState.activeBroadcast
+                if (activeBroadcast != null) {
+                    AlertDialog(
+                        onDismissRequest = {
+                            viewModel.dismissBroadcast(activeBroadcast.id)
+                        },
+                        title = {
+                            Text(
+                                text = if (activeBroadcast.title.isNotBlank()) activeBroadcast.title else "رسالة هامة",
+                                color = GoldBright,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = activeBroadcast.text,
+                                color = TextPrimary,
+                                fontSize = 16.sp,
+                                lineHeight = 24.sp
+                            )
+                        },
+                        containerColor = CardSurface,
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    viewModel.dismissBroadcast(activeBroadcast.id)
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = GoldPrimary,
+                                    contentColor = Color.Black
+                                ),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+                            ) {
+                                Text("موافق", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                            }
+                        }
+                    )
+                }
+                
+                val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner) {
+                    val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                        if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                            viewModel.checkSystemPermissions()
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
+                    }
+                }
+                
+                var exactAlarmDialogDismissed by remember { mutableStateOf(false) }
+                
+                if (!uiState.exactAlarmsAllowed && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !exactAlarmDialogDismissed) {
+                    AlertDialog(
+                        onDismissRequest = { exactAlarmDialogDismissed = true },
+                        title = { Text(text = "صلاحية التنبيهات الدقيقة", color = GoldBright) },
+                        text = { Text(text = "لضمان دقة وقت الأذان وعدم تأخره عن الوقت الفعلي، يرجى تفعيل صلاحية 'الإنذارات الدقيقة' (Alarms & Reminders) من إعدادات التطبيق.", color = TextPrimary) },
+                        containerColor = CardSurface,
+                        confirmButton = {
+                            TextButton(onClick = {
+                                try {
+                                    val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                        data = android.net.Uri.parse("package:$packageName")
+                                    }
+                                    startActivity(intent)
+                                } catch (e: Exception) {}
+                                exactAlarmDialogDismissed = true
+                            }) {
+                                Text("تفعيل الآن", color = GoldPrimary, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { exactAlarmDialogDismissed = true }) {
+                                Text("تجاهل", color = TextSecondary)
+                            }
+                        }
+                    )
+                }
+
+                val permissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestMultiplePermissions()
+                ) { permissions ->
+                    val locationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+                    if (locationGranted) {
+                        requestFreshLocation(viewModel)
+                    }
+                }
+
+                LaunchedEffect(Unit) {
+                    val permissionsToRequest = mutableListOf<String>()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                    if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                        permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
+                        permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                    }
+                    if (permissionsToRequest.isNotEmpty()) {
+                        permissionLauncher.launch(permissionsToRequest.toTypedArray())
+                    } else {
+                        requestFreshLocation(viewModel)
+                    }
+                }
+
+                val activeAthkarNotif = uiState.activeAthkarNotification
+                LaunchedEffect(activeAthkarNotif) {
+                    if (activeAthkarNotif != null) {
+                        showAthkarNotification(
+                            this@MainActivity,
+                            activeAthkarNotif.title,
+                            activeAthkarNotif.body,
+                            activeAthkarNotif.categoryId
+                        )
+                        val voiceMsg = when (activeAthkarNotif.categoryId) {
+                            "morning" -> "حان وقت قراءة أذكار الصباح"
+                            "evening" -> "حان وقت قراءة أذكار المساء"
+                            "sleep" -> "حان وقت قراءة أذكار النوم"
+                            else -> "حان وقت قراءة الأذكار"
+                        }
+                        speakText(voiceMsg)
+                        viewModel.clearAthkarNotification()
+                    }
+                }
 
                 val activeAdhanName = uiState.activeAdhanPrayerName
                 val currentMuezzin = remember(uiState.selectedMuezzinId) {
                     AthkarData.muezzinsList.find { it.id == uiState.selectedMuezzinId } ?: AthkarData.muezzinsList[0]
                 }
 
-                var adhanPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
-
                 LaunchedEffect(activeAdhanName, currentMuezzin) {
                     if (activeAdhanName != null) {
-                        adhanPlayer?.release()
-                        adhanPlayer = null
+                        showPrayerNotification(this@MainActivity, activeAdhanName)
+                        val serviceIntent = android.content.Intent(this@MainActivity, com.example.service.AdhanForegroundService::class.java).apply {
+                            action = com.example.service.AdhanForegroundService.ACTION_PLAY_ADHAN
+                            putExtra(com.example.service.AdhanForegroundService.EXTRA_PRAYER_NAME, activeAdhanName)
+                            putExtra(com.example.service.AdhanForegroundService.EXTRA_MUEZZIN_ID, uiState.selectedMuezzinId)
+                        }
                         try {
-                            val mp = android.media.MediaPlayer().apply {
-                                setAudioAttributes(
-                                    android.media.AudioAttributes.Builder()
-                                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
-                                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                                        .build()
-                                )
-                                setDataSource(currentMuezzin.audioUrl)
-                                setOnPreparedListener {
-                                    it.start()
-                                }
-                                setOnCompletionListener {
-                                    viewModel.stopAdhan()
-                                }
-                                setOnErrorListener { _, _, _ ->
-                                    viewModel.stopAdhan()
-                                    true
-                                }
-                                prepareAsync()
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                this@MainActivity.startForegroundService(serviceIntent)
+                            } else {
+                                this@MainActivity.startService(serviceIntent)
                             }
-                            adhanPlayer = mp
                         } catch (e: Exception) {
-                            viewModel.stopAdhan()
+                            e.printStackTrace()
                         }
                     } else {
-                        try {
-                            adhanPlayer?.stop()
-                        } catch (e: Exception) {}
-                        adhanPlayer?.release()
-                        adhanPlayer = null
+                        val stopIntent = android.content.Intent(this@MainActivity, com.example.service.AdhanForegroundService::class.java).apply {
+                            action = com.example.service.AdhanForegroundService.ACTION_STOP_ADHAN
+                        }
+                        this@MainActivity.startService(stopIntent)
                     }
                 }
 
                 DisposableEffect(Unit) {
+                    val receiver = object : android.content.BroadcastReceiver() {
+                        override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+                            if (intent.action == com.example.service.AdhanForegroundService.ACTION_ADHAN_STOPPED) {
+                                viewModel.stopAdhan()
+                            }
+                        }
+                    }
+                    val filter = android.content.IntentFilter(com.example.service.AdhanForegroundService.ACTION_ADHAN_STOPPED)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        this@MainActivity.registerReceiver(receiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+                    } else {
+                        this@MainActivity.registerReceiver(receiver, filter)
+                    }
                     onDispose {
                         try {
-                            adhanPlayer?.stop()
-                        } catch (e: Exception) {}
-                        adhanPlayer?.release()
-                        adhanPlayer = null
+                            this@MainActivity.unregisterReceiver(receiver)
+                        } catch (_: Exception) {}
                     }
                 }
 
@@ -200,103 +370,118 @@ class MainActivity : ComponentActivity() {
                     Screen.Home,
                     Screen.Tasbih,
                     Screen.Prayer,
+                    Screen.Radio,
                     Screen.Fortress,
                     Screen.Convert,
                     Screen.Settings
                 )
 
                 Box(modifier = Modifier.fillMaxSize()) {
+                    UpdateCheckerEffect()
+
+                    val haptic = LocalHapticFeedback.current
+                    val navBackStackEntry by navController.currentBackStackEntryAsState()
+                    val currentRoute = navBackStackEntry?.destination?.route
+
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
-                    containerColor = DarkCanvas,
-                    bottomBar = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .navigationBarsPadding()
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(32.dp),
-                                color = CardSurface.copy(alpha = 0.92f),
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    androidx.compose.ui.graphics.Brush.linearGradient(
-                                        colors = listOf(
-                                            GoldBright.copy(alpha = 0.4f),
-                                            GoldPrimary.copy(alpha = 0.15f),
-                                            GoldBright.copy(alpha = 0.3f)
-                                        )
-                                    )
-                                ),
-                                shadowElevation = 8.dp
+                        containerColor = DarkCanvas,
+                        bottomBar = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .navigationBarsPadding(),
+                                contentAlignment = Alignment.BottomCenter
                             ) {
-                                Row(
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 4.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
                                 ) {
-                                    val navBackStackEntry by navController.currentBackStackEntryAsState()
-                                    val currentRoute = navBackStackEntry?.destination?.route
-
-                                    items.forEach { screen ->
-                                        val isSelected = currentRoute == screen.route
-
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(20.dp))
-                                                .background(
-                                                    if (isSelected) GoldPrimary.copy(alpha = 0.1f) else androidx.compose.ui.graphics.Color.Transparent
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(32.dp),
+                                        color = CardSurface.copy(alpha = 0.92f),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            androidx.compose.ui.graphics.Brush.linearGradient(
+                                                colors = listOf(
+                                                    GoldBright.copy(alpha = 0.4f),
+                                                    GoldPrimary.copy(alpha = 0.15f),
+                                                    GoldBright.copy(alpha = 0.3f)
                                                 )
-                                                .clickable {
-                                                    if (currentRoute != screen.route) {
-                                                        navController.navigate(screen.route) {
-                                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                                saveState = true
+                                            )
+                                        ),
+                                        shadowElevation = 8.dp
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 4.dp, vertical = 6.dp),
+                                            horizontalArrangement = Arrangement.SpaceEvenly,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            items.forEachIndexed { index, screen ->
+                                                val isSelected = currentRoute == screen.route
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(20.dp))
+                                                        .background(
+                                                            if (isSelected) GoldPrimary.copy(alpha = 0.1f) else androidx.compose.ui.graphics.Color.Transparent
+                                                        )
+                                                        .clickable {
+                                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                            if (currentRoute != screen.route) {
+                                                                navController.navigate(screen.route) {
+                                                                    popUpTo(navController.graph.findStartDestination().id) {
+                                                                        saveState = true
+                                                                    }
+                                                                    launchSingleTop = true
+                                                                    restoreState = true
+                                                                }
                                                             }
-                                                            launchSingleTop = true
-                                                            restoreState = true
                                                         }
+                                                        .padding(vertical = 6.dp)
+                                                        .testTag("nav_item_${screen.route}"),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Column(
+                                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                                        verticalArrangement = Arrangement.Center
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
+                                                            contentDescription = screen.title,
+                                                            tint = if (isSelected) GoldBright else TextMuted,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.height(2.dp))
+                                                        Text(
+                                                            text = screen.title,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                            color = if (isSelected) GoldBright else TextMuted,
+                                                            maxLines = 1
+                                                        )
                                                     }
                                                 }
-                                                .padding(vertical = 6.dp)
-                                                .testTag("nav_item_${screen.route}"),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Column(
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
-                                                    contentDescription = screen.title,
-                                                    tint = if (isSelected) GoldBright else TextMuted,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = screen.title,
-                                                    fontSize = 9.5.sp,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (isSelected) GoldBright else TextMuted,
-                                                    maxLines = 1
-                                                )
                                             }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                ) { innerPadding ->
+                    ) { innerPadding ->
                     NavHost(
                         navController = navController,
                         startDestination = Screen.Home.route,
-                        modifier = Modifier.padding(innerPadding)
+                        modifier = Modifier.padding(innerPadding),
+                        enterTransition = { fadeIn(animationSpec = tween(60)) },
+                        exitTransition = { fadeOut(animationSpec = tween(60)) },
+                        popEnterTransition = { fadeIn(animationSpec = tween(60)) },
+                        popExitTransition = { fadeOut(animationSpec = tween(60)) }
                     ) {
                         composable(Screen.Home.route) {
                             HomeScreen(
@@ -304,6 +489,9 @@ class MainActivity : ComponentActivity() {
                                 onCategorySelected = { viewModel.selectCategory(it) },
                                 onDecrementDhikr = { catId, dhikrId, maxCount ->
                                     viewModel.decrementDhikr(catId, dhikrId, maxCount)
+                                },
+                                onSendBroadcast = { text, url, onResult ->
+                                    viewModel.sendBroadcastMessage(text, url, onResult)
                                 }
                             )
                         }
@@ -320,11 +508,14 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Prayer.route) {
                             PrayerTimesScreen(
                                 uiState = uiState,
-                                onCitySelected = { viewModel.selectCity(it) },
-                                onMethodSelected = { viewModel.selectMethod(it) }
+                                onMethodSelected = { viewModel.selectMethod(it) },
+                                onToggleMute = { viewModel.togglePrayerMute(it) }
                             )
                         }
 
+                        composable(Screen.Radio.route) {
+                            QuranRadioScreen(onBackClick = { navController.popBackStack() })
+                        }
                         composable(Screen.Fortress.route) {
                             FortressScreen(
                                 uiState = uiState,
@@ -344,10 +535,15 @@ class MainActivity : ComponentActivity() {
                                 uiState = uiState,
                                 onToggleSound = { viewModel.toggleSound() },
                                 onToggleNotifications = { viewModel.toggleNotifications() },
+                                onToggleMorningAthkar = { viewModel.toggleMorningAthkarNotify() },
+                                onToggleEveningAthkar = { viewModel.toggleEveningAthkarNotify() },
+                                onToggleSleepAthkar = { viewModel.toggleSleepAthkarNotify() },
                                 onMethodSelected = { viewModel.selectMethod(it) },
                                 onSetCustomLocation = { lat, lon, name -> viewModel.setCustomLocation(lat, lon, name) },
                                 onResetAll = { viewModel.resetAllData() },
-                                onSelectMuezzin = { viewModel.selectMuezzin(it) }
+                                onSelectMuezzin = { viewModel.selectMuezzin(it) },
+                                onCitySelected = { viewModel.selectCity(it) },
+                                onGPSRequested = { requestFreshLocation(viewModel) }
                             )
                         }
                     }
@@ -430,22 +626,184 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Mandatory Privacy Policy Consent Gate Overlay
-                    if (uiState.showPrivacyGate) {
-                        PrivacyConsentScreen(
-                            versionString = uiState.privacyVersion,
-                            policyUrl = uiState.privacyPolicyUrl,
-                            onAccept = {
-                                viewModel.acceptPrivacyPolicy()
-                            },
-                            onDecline = {
-                                finishAffinity()
-                            }
-                        )
-                    }
+                }
+
+                // Mandatory Privacy Policy Consent Gate Overlay
+                if (uiState.showPrivacyGate) {
+                    PrivacyConsentScreen(
+                        versionString = uiState.privacyVersion,
+                        policyUrl = uiState.privacyPolicyUrl,
+                        onAccept = {
+                            viewModel.acceptPrivacyPolicy()
+                        },
+                        onDecline = {
+                            finishAffinity()
+                        }
+                    )
                 }
             }
         }
     }
 }
+
+    private fun showPrayerNotification(context: android.content.Context, prayerName: String) {
+        val channelId = "prayer_times_channel"
+        val notificationManager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                channelId,
+                "مواقيت الصلاة والأذان",
+                android.app.NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "تنبيهات مواقيت الصلاة والأذان"
+                enableLights(true)
+                lightColor = android.graphics.Color.parseColor("#FFD700")
+                enableVibration(true)
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val intent = android.content.Intent(context, MainActivity::class.java).apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle("حان الآن موعد صلاة $prayerName")
+            .setContentText("الله أكبر الله أكبر.. حان الآن موعد الأذان حسب توقيتك المحلي")
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setCategory(androidx.core.app.NotificationCompat.CATEGORY_ALARM)
+            .build()
+
+        notificationManager.notify(1001, notification)
+    }
+
+    private fun showAthkarNotification(context: android.content.Context, title: String, body: String, categoryId: String) {
+        val channelId = "athkar_reminder_channel"
+        val notificationManager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                channelId,
+                "تذكير الأذكار",
+                android.app.NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "تنبيهات وتذكيرات بالأذكار اليومية"
+                enableLights(true)
+                lightColor = android.graphics.Color.parseColor("#FFD700")
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val intent = android.content.Intent(context, MainActivity::class.java).apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("target_category", categoryId)
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            context,
+            categoryId.hashCode(),
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        notificationManager.notify(categoryId.hashCode(), notification)
+    }
+
+    private fun requestFreshLocation(viewModel: com.example.ui.MainViewModel) {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            
+            try {
+                val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(this)
+                
+                // First try lastLocation for a quick result
+                fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
+                    if (loc != null) {
+                        resolveAndSetLocation(viewModel, loc.latitude, loc.longitude)
+                    } else {
+                        // If null, request current location (high accuracy)
+                        requestFreshGPSCurrentLocation(viewModel, fusedLocationClient)
+                    }
+                }.addOnFailureListener {
+                    requestFreshGPSCurrentLocation(viewModel, fusedLocationClient)
+                }
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(this, "فشل في تشغيل نظام تحديد المواقع", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun requestFreshGPSCurrentLocation(viewModel: com.example.ui.MainViewModel, fusedLocationClient: com.google.android.gms.location.FusedLocationProviderClient) {
+        try {
+            val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
+                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 1000
+            ).setMaxUpdates(1).build()
+
+            val locationCallback = object : com.google.android.gms.location.LocationCallback() {
+                override fun onLocationResult(locationResult: com.google.android.gms.location.LocationResult) {
+                    val lastLoc = locationResult.lastLocation
+                    if (lastLoc != null) {
+                        resolveAndSetLocation(viewModel, lastLoc.latitude, lastLoc.longitude)
+                    } else {
+                        android.widget.Toast.makeText(this@MainActivity, "تعذر الحصول على إحداثيات GPS حاليًا. تأكد من تفعيل الموقع بالهاتف.", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest, locationCallback, android.os.Looper.getMainLooper()
+            )
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(this, "فشل في تحديد الموقع بدقة", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun resolveAndSetLocation(viewModel: com.example.ui.MainViewModel, latitude: Double, longitude: Double) {
+        var cityName = "موقعي الحالي (GPS)"
+        try {
+            val geocoder = android.location.Geocoder(this@MainActivity, java.util.Locale("ar"))
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                geocoder.getFromLocation(latitude, longitude, 1) { addresses ->
+                    if (!addresses.isNullOrEmpty()) {
+                        val address = addresses[0]
+                        cityName = address.locality ?: address.subAdminArea ?: address.adminArea ?: "موقعي الحالي (GPS)"
+                    }
+                    runOnUiThread {
+                        viewModel.setCustomLocation(latitude, longitude, cityName)
+                        android.widget.Toast.makeText(this@MainActivity, "تم تحديد الموقع بنجاح: $cityName", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+                return
+            } else {
+                @Suppress("DEPRECATION")
+                val addresses = geocoder.getFromLocation(latitude, longitude, 1)
+                if (!addresses.isNullOrEmpty()) {
+                    val address = addresses[0]
+                    cityName = address.locality ?: address.subAdminArea ?: address.adminArea ?: "موقعي الحالي (GPS)"
+                }
+            }
+        } catch (_: Exception) {}
+        
+        viewModel.setCustomLocation(latitude, longitude, cityName)
+        android.widget.Toast.makeText(this@MainActivity, "تم تحديد الموقع بنجاح: $cityName", android.widget.Toast.LENGTH_LONG).show()
+    }
 }

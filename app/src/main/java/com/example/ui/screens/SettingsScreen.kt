@@ -1,9 +1,13 @@
 package com.example.ui.screens
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,26 +15,29 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.platform.LocalContext
+import android.media.MediaPlayer
+import android.media.AudioAttributes
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.example.data.AthkarData
 import com.example.ui.AthkarUiState
 import com.example.ui.theme.*
@@ -41,142 +48,102 @@ fun SettingsScreen(
     uiState: AthkarUiState,
     onToggleSound: () -> Unit,
     onToggleNotifications: () -> Unit,
-    onMethodSelected: (String) -> Unit,
-    onSetCustomLocation: (Double, Double, String) -> Unit,
+    onToggleMorningAthkar: () -> Unit = {},
+    onToggleEveningAthkar: () -> Unit = {},
+    onToggleSleepAthkar: () -> Unit = {},
+    onMethodSelected: (String) -> Unit = {},
+    onSetCustomLocation: (Double, Double, String) -> Unit = { _, _, _ -> },
     onResetAll: () -> Unit,
-    onSelectMuezzin: (String) -> Unit = {}
+    onSelectMuezzin: (String) -> Unit = {},
+    onCitySelected: (String) -> Unit = {},
+    onGPSRequested: () -> Unit = {}
 ) {
-    val context = LocalContext.current
-    var showResetDialog by remember { mutableStateOf(false) }
-    var showMethodPicker by remember { mutableStateOf(false) }
     var showReciterPicker by remember { mutableStateOf(false) }
-    var selectedReciter by remember { mutableStateOf("الشيخ مشاري بن راشد العفاسي") }
-    var isPlayingAdhanTest by remember { mutableStateOf(false) }
+    var showLocationPicker by remember { mutableStateOf(false) }
+    var previewMuezzinId by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
-    val currentMuezzin = remember(uiState.selectedMuezzinId) {
-        AthkarData.muezzinsList.find { it.id == uiState.selectedMuezzinId } ?: AthkarData.muezzinsList[0]
-    }
+    var previewPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var previewAfd by remember { mutableStateOf<android.content.res.AssetFileDescriptor?>(null) }
 
-    var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
-
-    LaunchedEffect(isPlayingAdhanTest, currentMuezzin) {
-        if (isPlayingAdhanTest) {
-            mediaPlayer?.release()
-            mediaPlayer = null
-            try {
-                val mp = android.media.MediaPlayer().apply {
-                    setAudioAttributes(
-                        android.media.AudioAttributes.Builder()
-                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
-                            .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                            .build()
-                    )
-                    setDataSource(currentMuezzin.audioUrl)
-                    setOnPreparedListener {
-                        it.start()
-                    }
-                    setOnCompletionListener {
-                        isPlayingAdhanTest = false
-                    }
-                    setOnErrorListener { _, _, _ ->
-                        isPlayingAdhanTest = false
-                        true
-                    }
-                    prepareAsync()
-                }
-                mediaPlayer = mp
-            } catch (e: Exception) {
-                isPlayingAdhanTest = false
+    val stopPreview: () -> Unit = {
+        try {
+            previewPlayer?.apply {
+                if (isPlaying) stop()
+                release()
             }
-        } else {
-            try {
-                mediaPlayer?.stop()
-            } catch (e: Exception) {}
-            mediaPlayer?.release()
-            mediaPlayer = null
-        }
+        } catch (_: Exception) {}
+        try {
+            previewAfd?.close()
+        } catch (_: Exception) {}
+        previewPlayer = null
+        previewAfd = null
+        previewMuezzinId = null
     }
 
     DisposableEffect(Unit) {
         onDispose {
+            stopPreview()
+        }
+    }
+
+    val playPreview: (com.example.data.MuezzinItem) -> Unit = { muezzin ->
+        val isSame = (previewMuezzinId == muezzin.id)
+        stopPreview()
+
+        if (!isSame) {
             try {
-                mediaPlayer?.stop()
-            } catch (e: Exception) {}
-            mediaPlayer?.release()
-            mediaPlayer = null
-        }
-    }
-
-    var hasNotificationPermission by remember {
-        mutableStateOf(
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) == PackageManager.PERMISSION_GRANTED
-            } else true
-        )
-    }
-
-    val notifPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasNotificationPermission = isGranted
-        if (isGranted) {
-            onToggleNotifications()
-        }
-    }
-
-    var fetchRealLocationLambda by remember { mutableStateOf<(() -> Unit)?>(null) }
-
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            fetchRealLocationLambda?.invoke()
-        } else {
-            android.widget.Toast.makeText(context, "تم رفض صلاحية تحديد الموقع الجغرافي.", android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    fun fetchRealLocation() {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            try {
-                val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
-                fusedLocationClient.lastLocation
-                    .addOnSuccessListener { loc ->
-                        if (loc != null) {
-                            onSetCustomLocation(loc.latitude, loc.longitude, "موقعي الحالي (GPS)")
-                            android.widget.Toast.makeText(context, "تم تحديد موقعك الجغرافي بنجاح", android.widget.Toast.LENGTH_SHORT).show()
-                        } else {
-                            val priority = com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
-                            fusedLocationClient.getCurrentLocation(priority, null)
-                                .addOnSuccessListener { currentLoc ->
-                                    if (currentLoc != null) {
-                                        onSetCustomLocation(currentLoc.latitude, currentLoc.longitude, "موقعي الحالي (GPS)")
-                                        android.widget.Toast.makeText(context, "تم تحديد موقعك الجغرافي بنجاح", android.widget.Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        android.widget.Toast.makeText(context, "الموقع الحالي غير متاح حالياً. يرجى التأكد من تفعيل الـ GPS بالجهاز.", android.widget.Toast.LENGTH_LONG).show()
-                                    }
-                                }
-                                .addOnFailureListener { err ->
-                                    android.widget.Toast.makeText(context, "تعذر الحصول على الموقع: ${err.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
-                                }
-                        }
+                val mp = MediaPlayer().apply {
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .build()
+                    )
+                    setVolume(1.0f, 1.0f)
+                    
+                    if (muezzin.audioUrl.startsWith("asset:")) {
+                        val path = muezzin.audioUrl.removePrefix("asset:")
+                        val afd = context.assets.openFd(path)
+                        previewAfd = afd
+                        setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    } else {
+                        setDataSource(context, android.net.Uri.parse(muezzin.audioUrl))
                     }
-                    .addOnFailureListener { err ->
-                        android.widget.Toast.makeText(context, "تعذر قراءة بيانات الموقع: ${err.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                    setOnCompletionListener {
+                        try { it.release() } catch (_: Exception) {}
+                        previewPlayer = null
+                        previewMuezzinId = null
+                        try { previewAfd?.close() } catch (_: Exception) {}
+                        previewAfd = null
                     }
+                    setOnErrorListener { _, what, extra ->
+                        android.util.Log.e("MediaPlayer", "Preview Error what: $what extra: $extra")
+                        try { release() } catch (_: Exception) {}
+                        previewPlayer = null
+                        previewMuezzinId = null
+                        try { previewAfd?.close() } catch (_: Exception) {}
+                        previewAfd = null
+                        true
+                    }
+                    setOnPreparedListener { 
+                        it.start() 
+                    }
+                    prepareAsync()
+                }
+                previewPlayer = mp
+                previewMuezzinId = muezzin.id
             } catch (e: Exception) {
-                android.widget.Toast.makeText(context, "حدث خطأ أثناء الاتصال بمزود الموقع: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+                android.util.Log.e("MediaPlayer", "Preview Exception: ${e.message}", e)
+                stopPreview()
             }
-        } else {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
-    fetchRealLocationLambda = { fetchRealLocation() }
+    val currentMuezzin = remember(uiState.selectedMuezzinId) {
+        AthkarData.muezzinsList.find { it.id == uiState.selectedMuezzinId } ?: AthkarData.muezzinsList[0]
+    }
 
     Box(
         modifier = Modifier
@@ -260,86 +227,119 @@ fun SettingsScreen(
                     color = CardSurface,
                     border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = "التنبيهات",
-                                tint = GoldPrimary
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = "تنبيهات الأذكار",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = TextPrimary
-                                )
-                                Text(
-                                    text = "تذكيرات اليومية بأذكار الصباح والمساء",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = TextSecondary
-                                )
-                            }
-                        }
-
-                        Switch(
-                            checked = uiState.notificationsEnabled,
-                            onCheckedChange = { onToggleNotifications() },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = DarkCanvas,
-                                checkedTrackColor = GoldPrimary
-                            ),
-                            modifier = Modifier.testTag("switch_notif")
-                        )
-                    }
-                }
-            }
-
-            // GPS Location Setting
-            item {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .clickable { fetchRealLocation() }
-                        .testTag("btn_gps_location"),
-                    color = CardSurface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.4f))
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(16.dp)
                     ) {
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = "الموقع الحالي",
-                                tint = GoldBright
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Notifications,
+                                    contentDescription = "التنبيهات",
+                                    tint = GoldPrimary
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "تنبيهات الأذكار",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = TextPrimary
+                                    )
+                                    Text(
+                                        text = "تذكيرات اليومية بأذكار الصباح والمساء والنوم",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = uiState.notificationsEnabled,
+                                onCheckedChange = { onToggleNotifications() },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = DarkCanvas,
+                                    checkedTrackColor = GoldPrimary
+                                ),
+                                modifier = Modifier.testTag("switch_notif")
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
+                        }
+
+                        if (uiState.notificationsEnabled) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            HorizontalDivider(color = CardBorder.copy(alpha = 0.5f))
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Morning Athkar Switch
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
                                 Text(
-                                    text = "تحديد موقعي الحالي عبر الـ GPS",
-                                    style = MaterialTheme.typography.titleMedium,
+                                    text = "تنبيه أذكار الصباح (02:00 م)",
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = TextPrimary
                                 )
+                                Switch(
+                                    checked = uiState.morningAthkarNotify,
+                                    onCheckedChange = { onToggleMorningAthkar() },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = DarkCanvas,
+                                        checkedTrackColor = GoldPrimary
+                                    )
+                                )
+                            }
+
+                            // Evening Athkar Switch
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
                                 Text(
-                                    text = uiState.customLocation?.let { "الموقع المحدد: ${it.name}" } ?: "انقر لتحديث إحداثياتك الفعليّة بدقة متناهية",
+                                    text = "تنبيه أذكار المساء (05:00 م)",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = GoldBright
+                                    color = TextPrimary
+                                )
+                                Switch(
+                                    checked = uiState.eveningAthkarNotify,
+                                    onCheckedChange = { onToggleEveningAthkar() },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = DarkCanvas,
+                                        checkedTrackColor = GoldPrimary
+                                    )
+                                )
+                            }
+
+                            // Sleep Athkar Switch
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "تنبيه أذكار النوم (10:00 م)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = TextPrimary
+                                )
+                                Switch(
+                                    checked = uiState.sleepAthkarNotify,
+                                    onCheckedChange = { onToggleSleepAthkar() },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = DarkCanvas,
+                                        checkedTrackColor = GoldPrimary
+                                    )
                                 )
                             }
                         }
@@ -347,15 +347,22 @@ fun SettingsScreen(
                 }
             }
 
-            // Calculation Method Picker
+            // Geographical Location Settings Card
             item {
+                val currentLocName = if (uiState.customLocation != null) {
+                    uiState.customLocation.name
+                } else {
+                    val activeCity = AthkarData.presetCities.find { it.key == uiState.selectedCityKey }
+                    activeCity?.name ?: "مكة المكرمة"
+                }
+
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
                         .clip(RoundedCornerShape(22.dp))
-                        .clickable { showMethodPicker = true }
-                        .testTag("btn_select_method"),
+                        .clickable { showLocationPicker = true }
+                        .testTag("btn_select_location"),
                     color = CardSurface,
                     border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
                 ) {
@@ -371,21 +378,21 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "طريقة الحساب",
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "الموقع الجغرافي",
                                 tint = GoldPrimary
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "طريقة حساب مواقيت الصلاة",
+                                    text = "الموقع الجغرافي",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = TextPrimary
                                 )
                                 Text(
-                                    text = AthkarData.calculationMethods[uiState.selectedMethodKey] ?: "أم القرى",
+                                    text = currentLocName,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = TextSecondary
+                                    color = GoldBright
                                 )
                             }
                         }
@@ -393,7 +400,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Select Reciter (اختيار القارئ)
+            // Select Reciter / Muezzin
             item {
                 Surface(
                     modifier = Modifier
@@ -417,8 +424,8 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "القارئ",
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = "المؤذن",
                                 tint = GoldPrimary
                             )
                             Spacer(modifier = Modifier.width(12.dp))
@@ -439,127 +446,74 @@ fun SettingsScreen(
                 }
             }
 
-            // Adhan Background & Alarm Permissions (صلاحيات الأذان والعمل في الخلفية)
+
+
+            // More Apps Section
             item {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    shape = RoundedCornerShape(22.dp),
-                    color = CardSurface,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(20.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardSurface),
+                    border = BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = "الصلاحيات",
-                                tint = GoldBright
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "صلاحيات الأذان والعمل في الخلفية",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = TextPrimary
-                                )
-                                Text(
-                                    text = "لتشغيل صوت الأذان تلقائيًا عند دخول الوقت عبر التطبيقات والأدوات",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = TextSecondary
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Text(
+                            text = "تطبيقاتنا الإسلامية",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = GoldBright,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "استكشف المزيد من تطبيقاتنا المفيدة والنافعة",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Button(
+                            onClick = {
+                                try {
+                                    val intent = Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://service-22989443747.europe-west2.run.app/")
+                                    )
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {}
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = GoldPrimary,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("btn_more_apps")
                         ) {
-                            Button(
-                                onClick = {
-                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                                        notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (hasNotificationPermission) AccentEmerald.copy(alpha = 0.2f) else GoldPrimary,
-                                    contentColor = if (hasNotificationPermission) AccentEmeraldLight else DarkCanvas
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = if (hasNotificationPermission) "إذن الإشعارات مفعّل ✓" else "طلب إذن الإشعارات",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-
-                            OutlinedButton(
-                                onClick = { isPlayingAdhanTest = !isPlayingAdhanTest },
-                                shape = RoundedCornerShape(8.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, GoldBright),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = if (isPlayingAdhanTest) Icons.Default.Delete else Icons.Default.PlayArrow,
-                                    contentDescription = "تجربة",
-                                    tint = GoldBright,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (isPlayingAdhanTest) "إيقاف الأذان" else "تجربة صوت الأذان",
-                                    fontSize = 12.sp,
-                                    color = GoldBright
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = Color.Black
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "المزيد من تطبيقاتنا",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
             }
 
-
-
-            // Reset Data
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-                Button(
-                    onClick = { showResetDialog = true },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF3D1E1E),
-                        contentColor = Color(0xFFFF8A8A)
-                    ),
-                    shape = RoundedCornerShape(22.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .testTag("btn_reset_all")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "إعادة تعيين",
-                        tint = Color(0xFFFF8A8A)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "إعادة تعيين كافة البيانات والتقدم",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
             // Version Info
             item {
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -572,9 +526,10 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "الإصدار v2.0.0",
-                        fontSize = 12.sp,
-                        color = TextSecondary
+                        text = "الإصدار v${com.example.BuildConfig.VERSION_NAME}",
+                        fontSize = 13.sp,
+                        color = TextSecondary,
+                        fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                 }
@@ -583,168 +538,410 @@ fun SettingsScreen(
 
         // Reciters Picker Bottom Sheet
         if (showReciterPicker) {
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             ModalBottomSheet(
-                onDismissRequest = { showReciterPicker = false },
+                onDismissRequest = {
+                    stopPreview()
+                    showReciterPicker = false
+                },
+                sheetState = sheetState,
                 containerColor = CardSurface,
-                scrimColor = Color.Black.copy(alpha = 0.6f)
+                dragHandle = {
+                    BottomSheetDefaults.DragHandle(color = GoldBright.copy(alpha = 0.5f))
+                }
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 22.dp, vertical = 12.dp)
                 ) {
-                    Text(
-                        text = "مكتبة المؤذنين - اختر صوت الأذان",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = GoldBright,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-
-                    AthkarData.muezzinsList.forEach { muezzin ->
-                        val isSelected = uiState.selectedMuezzinId == muezzin.id
-
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clip(CircleShape)
-                                .clickable {
-                                    onSelectMuezzin(muezzin.id)
-                                    showReciterPicker = false
-                                },
-                            shape = CircleShape,
-                            color = if (isSelected) GoldPrimary.copy(alpha = 0.15f) else CardSurfaceVariant.copy(alpha = 0.4f),
-                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, GoldBright) else androidx.compose.foundation.BorderStroke(0.5.dp, CardBorder)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = CircleShape,
+                                color = GoldPrimary.copy(alpha = 0.2f),
+                                modifier = Modifier.size(42.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = muezzin.name,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = TextPrimary
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = muezzin.description,
-                                        fontSize = 12.sp,
-                                        color = TextSecondary
-                                    )
-                                }
-                                if (isSelected) {
+                                Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "محدد",
-                                        tint = GoldBright
+                                        imageVector = Icons.Default.Notifications,
+                                        contentDescription = null,
+                                        tint = GoldBright,
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
                             }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
-            }
-        }
-        if (showMethodPicker) {
-            ModalBottomSheet(
-                onDismissRequest = { showMethodPicker = false },
-                containerColor = CardSurface,
-                scrimColor = Color.Black.copy(alpha = 0.6f)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = "طريقة الحساب الرياضي",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = GoldBright,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-
-                    AthkarData.calculationMethods.forEach { (key, name) ->
-                        val isSelected = uiState.selectedMethodKey == key
-
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clip(CircleShape)
-                                .clickable {
-                                    onMethodSelected(key)
-                                    showMethodPicker = false
-                                },
-                            shape = CircleShape,
-                            color = if (isSelected) GoldPrimary.copy(alpha = 0.15f) else CardSurfaceVariant.copy(alpha = 0.4f),
-                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, GoldBright) else androidx.compose.foundation.BorderStroke(0.5.dp, CardBorder)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
                                 Text(
-                                    text = name,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = TextPrimary,
-                                    modifier = Modifier.weight(1f)
+                                    text = "مكتبة أصوات الأذان",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GoldBright
+                                )
+                                Text(
+                                    text = "اختر المؤذن لتنبيهات الصلوات",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary
                                 )
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Spacer(modifier = Modifier.height(18.dp))
+                    HorizontalDivider(color = CardBorder.copy(alpha = 0.5f), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Muezzins List
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        AthkarData.muezzinsList.forEach { muezzin ->
+                            val isSelected = uiState.selectedMuezzinId == muezzin.id
+
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 5.dp)
+                                    .clip(RoundedCornerShape(18.dp)),
+                                shape = RoundedCornerShape(18.dp),
+                                color = if (isSelected) GoldPrimary.copy(alpha = 0.22f) else CardSurfaceVariant.copy(alpha = 0.35f),
+                                border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, GoldBright) else androidx.compose.foundation.BorderStroke(0.5.dp, CardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val isPreviewing = previewMuezzinId == muezzin.id
+                                    IconButton(
+                                        onClick = { playPreview(muezzin) },
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = if (isPreviewing) Color(0xFFFF6B6B).copy(alpha = 0.2f) else GoldPrimary.copy(alpha = 0.15f),
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = if (isPreviewing) Icons.Default.Close else Icons.Default.PlayArrow,
+                                                    contentDescription = "تجربة الصوت",
+                                                    tint = if (isPreviewing) Color(0xFFFF6B6B) else GoldBright,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Row(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable {
+                                                stopPreview()
+                                                onSelectMuezzin(muezzin.id)
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "تم اختيار صوت ${muezzin.name} للأذان بنجاح",
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                                coroutineScope.launch {
+                                                    sheetState.hide()
+                                                    showReciterPicker = false
+                                                }
+                                            },
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = muezzin.name,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = if (isSelected) GoldBright else TextPrimary,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                textAlign = TextAlign.Start
+                                            )
+                                            Text(
+                                                text = muezzin.description,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = TextSecondary,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "محدد",
+                                                tint = GoldBright,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        // Reset Confirmation Dialog
-        if (showResetDialog) {
-            AlertDialog(
-                onDismissRequest = { showResetDialog = false },
+        // Location Selector Bottom Sheet
+        if (showLocationPicker) {
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            var citySearchQuery by remember { mutableStateOf("") }
+
+            ModalBottomSheet(
+                onDismissRequest = { showLocationPicker = false },
+                sheetState = sheetState,
                 containerColor = CardSurface,
-                title = {
-                    Text(
-                        text = "إعادة تعيين التطبيق",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = GoldBright
-                    )
-                },
-                text = {
-                    Text(
-                        text = "هل أنت متأكد من رغبتك في إعادة تعيين كافة البيانات والتقدم المكتسب لجميع الأذكار والسبحة؟",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = TextPrimary
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            onResetAll()
-                            showResetDialog = false
-                        }
+                dragHandle = {
+                    BottomSheetDefaults.DragHandle(color = GoldBright.copy(alpha = 0.5f))
+                }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 22.dp, vertical = 12.dp)
+                ) {
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "نعم، إعادة تعيين",
-                            color = Color(0xFFFF8A8A),
-                            fontWeight = FontWeight.Bold
-                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = GoldPrimary.copy(alpha = 0.2f),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = GoldBright,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "تحديد موقع مواقيت الصلاة لجميع الدول",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = GoldBright
+                            )
+                            Text(
+                                text = "اختر مدينتك أو فعّل الـ GPS لتوقيت دقيق لأي دولة في العالم",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
                     }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showResetDialog = false }) {
-                        Text(
-                            text = "إلغاء",
-                            color = TextSecondary
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Search input
+                    OutlinedTextField(
+                        value = citySearchQuery,
+                        onValueChange = { citySearchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        placeholder = {
+                            Text("ابحث عن اسم المدينة أو الدولة (مثل: مكة، عمان، القاهرة، فرنسا...)", fontSize = 13.sp, color = TextSecondary.copy(alpha = 0.7f))
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = "بحث", tint = GoldBright)
+                        },
+                        trailingIcon = {
+                            if (citySearchQuery.isNotBlank()) {
+                                IconButton(onClick = { citySearchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "مسح", tint = TextSecondary)
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldBright,
+                            unfocusedBorderColor = CardBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
                         )
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = CardBorder.copy(alpha = 0.5f), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Main Scrollable Area
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        // 1. GPS Automatic Trigger Option
+                        if (citySearchQuery.isBlank()) {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .clickable {
+                                        onGPSRequested()
+                                        coroutineScope.launch {
+                                            sheetState.hide()
+                                            showLocationPicker = false
+                                        }
+                                    },
+                                shape = RoundedCornerShape(18.dp),
+                                color = GoldPrimary.copy(alpha = 0.15f),
+                                border = androidx.compose.foundation.BorderStroke(1.5.dp, GoldBright)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = GoldBright.copy(alpha = 0.25f),
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.LocationOn,
+                                                contentDescription = null,
+                                                tint = GoldBright,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(14.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "تحديد موقعي التلقائي (GPS)",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = GoldBright
+                                        )
+                                        Text(
+                                            text = "حساب فلكي دقيق حسب إحداثياتك في أي دولة بالعالم",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = TextSecondary
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "المدن والدول المتاحة",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextSecondary,
+                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+                            )
+                        }
+
+                        // 2. Preset Cities List (Filtered)
+                        val filteredCities = if (citySearchQuery.isBlank()) {
+                            AthkarData.presetCities
+                        } else {
+                            AthkarData.presetCities.filter {
+                                it.name.contains(citySearchQuery, ignoreCase = true) ||
+                                it.country.contains(citySearchQuery, ignoreCase = true) ||
+                                it.key.contains(citySearchQuery, ignoreCase = true)
+                            }
+                        }
+
+                        if (filteredCities.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "لم يتم العثور على مدينة مطابقة. يمكنك استخدام GPS لتحديد موقعك تلقائياً.",
+                                    color = TextSecondary,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        } else {
+                            filteredCities.forEach { city ->
+                                val isSelected = uiState.selectedCityKey == city.key && uiState.customLocation == null
+
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 5.dp)
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .clickable {
+                                            onCitySelected(city.key)
+                                            coroutineScope.launch {
+                                                sheetState.hide()
+                                                showLocationPicker = false
+                                            }
+                                        },
+                                    shape = RoundedCornerShape(18.dp),
+                                    color = if (isSelected) GoldPrimary.copy(alpha = 0.22f) else CardSurfaceVariant.copy(alpha = 0.35f),
+                                    border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, GoldBright) else androidx.compose.foundation.BorderStroke(0.5.dp, CardBorder)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = city.name,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = if (isSelected) GoldBright else TextPrimary,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                textAlign = TextAlign.Start
+                                            )
+                                            if (city.country.isNotBlank()) {
+                                                Text(
+                                                    text = city.country,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = GoldBright.copy(alpha = 0.8f),
+                                                    fontSize = 12.sp
+                                                )
+                                            }
+                                        }
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "محدد",
+                                                tint = GoldBright,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-            )
+            }
         }
     }
 }

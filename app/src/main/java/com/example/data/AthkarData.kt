@@ -711,52 +711,34 @@ object AthkarData {
 
     val muezzinsList = listOf(
         MuezzinItem(
-            id = "mishaari",
-            name = "الشيخ مشاري بن راشد العفاسي",
-            description = "أذان خاشع وعذب ونقي جداً - دولة الكويت",
-            audioUrl = "https://cdn.islamicfinder.org/athan/mishary.mp3"
-        ),
-        MuezzinItem(
-            id = "makkah",
-            name = "أذان المسجد الحرام - مكة المكرمة",
-            description = "الأذان المكي الجليل والصادح من جوار الكعبة المشرفة",
-            audioUrl = "https://cdn.islamicfinder.org/athan/makkah.mp3"
-        ),
-        MuezzinItem(
-            id = "madinah",
-            name = "أذان المسجد النبوي - المدينة المنورة",
-            description = "الأذان المدني الخاشع والهادئ من طيبة الطيبة",
-            audioUrl = "https://cdn.islamicfinder.org/athan/madinah.mp3"
+            id = "minshawi",
+            name = "الشيخ محمد صديق المنشاوي",
+            description = "أذان الخشوع والترتيل النادر الخالد (صوت محلي عالي الدقة)",
+            audioUrl = "asset:adhan/minshawi.mp3"
         ),
         MuezzinItem(
             id = "abdulbasit",
             name = "الشيخ عبد الباسط عبد الصمد",
-            description = "الأذان المصري الخالد والأصيل بصوت كروان القراء",
-            audioUrl = "https://server7.mp3quran.net/basit/001.mp3"
+            description = "الأذان المصري الخالد والأصيل (صوت محلي عالي الدقة)",
+            audioUrl = "asset:adhan/abdulbasit.mp3"
         ),
         MuezzinItem(
-            id = "aqsa",
-            name = "أذان المسجد الأقصى المبارك - القدس",
-            description = "أذان بيت المقدس الشريف العريق والتاريخي",
-            audioUrl = "https://cdn.islamicfinder.org/athan/aqsa.mp3"
+            id = "mishaari",
+            name = "الشيخ مشاري بن راشد العفاسي",
+            description = "أذان خاشع وعذب ونقي جداً (صوت محلي عالي الدقة)",
+            audioUrl = "asset:adhan/mishaari.mp3"
         ),
         MuezzinItem(
             id = "maher",
             name = "الشيخ ماهر المعيقلي",
-            description = "أذان المسجد الحرام بصوت المؤذن القارئ ماهر المعيقلي",
-            audioUrl = "https://server12.mp3quran.net/maher/001.mp3"
+            description = "أذان بصوت الشيخ ماهر المعيقلي (صوت محلي)",
+            audioUrl = "asset:adhan/maher.mp3"
         ),
         MuezzinItem(
-            id = "minshawi",
-            name = "الشيخ محمد صديق المنشاوي",
-            description = "أذان الخشوع والترتيل المبكي والنقي",
-            audioUrl = "https://server10.mp3quran.net/minsh/001.mp3"
-        ),
-        MuezzinItem(
-            id = "hudhaify",
-            name = "الشيخ علي بن عبد الرحمن الحذيفي",
-            description = "أذان المسجد النبوي الشريف بصوت شيخ القراء",
-            audioUrl = "https://server9.mp3quran.net/hthfi/001.mp3"
+            id = "dosari",
+            name = "الشيخ ياسر الدوسري",
+            description = "أذان ندي وخاشع بصوت الشيخ ياسر الدوسري (صوت محلي)",
+            audioUrl = "asset:adhan/dosari.mp3"
         )
     )
 
@@ -771,22 +753,125 @@ object AthkarData {
         TasbihPhrase("لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ", 100, "سُبْحَانَ اللهِ")
     )
 
+    // TODO: الحقل الثالث (3.0) هنا هو حالياً timezone offset وليس ارتفاع سطح البحر (Elevation).
+    // يجب إضافة حقل elevation منفصل لاحقاً لحساب أدق لمواقيت الصلاة حسب ارتفاع كل محافظة.
     val presetCities = listOf(
-        CityPreset("mecca", "مكة المكرمة", 21.4273, 39.8261, 3.0, "umm_alqura"),
-        CityPreset("medina", "المدينة المنورة", 24.4672, 39.6111, 3.0, "umm_alqura"),
-        CityPreset("riyadh", "الرياض", 24.7136, 46.6753, 3.0, "umm_alqura"),
-        CityPreset("jerusalem", "القدس الشريف", 31.7683, 35.2137, 3.0, "mwl"),
-        CityPreset("cairo", "القاهرة", 30.0444, 31.2357, 3.0, "egypt"),
-        CityPreset("amman", "عمّان", 31.9522, 35.9106, 3.0, "mwl"),
-        CityPreset("dubai", "دبي", 25.2048, 55.2708, 4.0, "umm_alqura"),
-        CityPreset("london", "لندن", 51.5074, -0.1278, 1.0, "mwl"),
-        CityPreset("newyork", "نيويورك", 40.7128, -74.0060, -4.0, "isna")
+        // الأردن
+        CityPreset("amman", "عمّان", 31.9522, 35.9106, 3.0, "karachi", "الأردن"),
+        CityPreset("irbid", "إربد", 32.5568, 35.8469, 3.0, "karachi", "الأردن"),
+        CityPreset("zarqa", "الزرقاء", 32.0608, 36.0872, 3.0, "karachi", "الأردن"),
+        CityPreset("aqaba", "العقبة", 29.5321, 35.0063, 3.0, "karachi", "الأردن"),
+        CityPreset("salt", "السلط", 32.0392, 35.7272, 3.0, "karachi", "الأردن"),
+        CityPreset("jerash", "جرش", 32.2723, 35.8914, 3.0, "karachi", "الأردن"),
+        CityPreset("ajloun", "عجلون", 32.3326, 35.7517, 3.0, "karachi", "الأردن"),
+        CityPreset("mafraq", "المفرق", 32.3400, 36.2084, 3.0, "karachi", "الأردن"),
+        CityPreset("madaba", "مأدبا", 31.7167, 35.7933, 3.0, "karachi", "الأردن"),
+        CityPreset("karak", "الكرك", 31.1853, 35.7048, 3.0, "karachi", "الأردن"),
+        CityPreset("tafilah", "الطفيلة", 30.8358, 35.6042, 3.0, "karachi", "الأردن"),
+        CityPreset("maan", "معان", 30.1949, 35.7342, 3.0, "karachi", "الأردن"),
+
+        // السعودية
+        CityPreset("mecca", "مكة المكرمة", 21.4273, 39.8261, 3.0, "umm_alqura", "السعودية"),
+        CityPreset("medina", "المدينة المنورة", 24.4672, 39.6111, 3.0, "umm_alqura", "السعودية"),
+        CityPreset("riyadh", "الرياض", 24.7136, 46.6753, 3.0, "umm_alqura", "السعودية"),
+        CityPreset("jeddah", "جدة", 21.4858, 39.1925, 3.0, "umm_alqura", "السعودية"),
+        CityPreset("dammam", "الدمام", 26.4207, 50.0888, 3.0, "umm_alqura", "السعودية"),
+
+        // فلسطين
+        CityPreset("jerusalem", "القدس الشريف", 31.7683, 35.2137, 3.0, "mwl", "فلسطين"),
+        CityPreset("gaza", "غزة", 31.5017, 34.4668, 3.0, "egypt", "فلسطين"),
+        CityPreset("ramallah", "رام الله", 31.9038, 35.2034, 3.0, "mwl", "فلسطين"),
+        CityPreset("nablus", "نابلس", 32.2211, 35.2544, 3.0, "mwl", "فلسطين"),
+        CityPreset("hebron", "الخليل", 31.5326, 35.0998, 3.0, "mwl", "فلسطين"),
+
+        // مصر
+        CityPreset("cairo", "القاهرة", 30.0444, 31.2357, 3.0, "egypt", "مصر"),
+        CityPreset("alexandria", "الإسكندرية", 31.2001, 29.9187, 3.0, "egypt", "مصر"),
+        CityPreset("giza", "الجيزة", 30.0131, 31.2089, 3.0, "egypt", "مصر"),
+        CityPreset("mansoura", "المنصورة", 31.0409, 31.3785, 3.0, "egypt", "مصر"),
+        CityPreset("aswan", "أسوان", 24.0889, 32.8998, 3.0, "egypt", "مصر"),
+
+        // الإمارات
+        CityPreset("dubai", "دبي", 25.2048, 55.2708, 4.0, "dubai", "الإمارات"),
+        CityPreset("abudhabi", "أبوظبي", 24.4539, 54.3773, 4.0, "dubai", "الإمارات"),
+        CityPreset("sharjah", "الشارقة", 25.3463, 55.4209, 4.0, "dubai", "الإمارات"),
+
+        // قطر، الكويت، البحرين، عمان
+        CityPreset("doha", "الدوحة", 25.2854, 51.5310, 3.0, "qatar", "قطر"),
+        CityPreset("kuwait_city", "مدينة الكويت", 29.3759, 47.9774, 3.0, "kuwait", "الكويت"),
+        CityPreset("manama", "المنامة", 26.2285, 50.5860, 3.0, "umm_alqura", "البحرين"),
+        CityPreset("muscat", "مسقط", 23.5880, 58.3829, 4.0, "umm_alqura", "عُمان"),
+
+        // سوريا ولبنان والعراق واليمن
+        CityPreset("damascus", "دمشق", 33.5138, 36.2765, 3.0, "egypt", "سوريا"),
+        CityPreset("aleppo", "حلب", 36.2021, 37.1343, 3.0, "egypt", "سوريا"),
+        CityPreset("beirut", "بيروت", 33.8938, 35.5018, 3.0, "egypt", "لبنان"),
+        CityPreset("baghdad", "بغداد", 33.3152, 44.3661, 3.0, "umm_alqura", "العراق"),
+        CityPreset("erbil", "أربيل", 36.1901, 44.0091, 3.0, "umm_alqura", "العراق"),
+        CityPreset("basra", "البصرة", 30.5081, 47.7835, 3.0, "umm_alqura", "العراق"),
+        CityPreset("sanaa", "صنعاء", 15.3694, 44.1910, 3.0, "umm_alqura", "اليمن"),
+        CityPreset("aden", "عدن", 12.7855, 45.0187, 3.0, "umm_alqura", "اليمن"),
+
+        // المغرب العربي
+        CityPreset("rabat", "الرباط", 34.0209, -6.8416, 1.0, "mwl", "المغرب"),
+        CityPreset("casablanca", "الدار البيضاء", 33.5731, -7.5898, 1.0, "mwl", "المغرب"),
+        CityPreset("marrakech", "مراكش", 31.6295, -7.9811, 1.0, "mwl", "المغرب"),
+        CityPreset("algiers", "الجزائر العاصمة", 36.7538, 3.0588, 1.0, "mwl", "الجزائر"),
+        CityPreset("oran", "وهران", 35.6987, -0.6349, 1.0, "mwl", "الجزائر"),
+        CityPreset("tunis", "تونس العاصمة", 36.8065, 10.1815, 1.0, "mwl", "تونس"),
+        CityPreset("tripoli_ly", "طرابلس", 32.8872, 13.1913, 2.0, "egypt", "ليبيا"),
+        CityPreset("benghazi", "بنغازي", 32.1167, 20.0667, 2.0, "egypt", "ليبيا"),
+
+        // السودان والصومال وموريتانيا
+        CityPreset("khartoum", "الخرطوم", 15.5007, 32.5599, 2.0, "egypt", "السودان"),
+        CityPreset("mogadishu", "مقديشو", 2.0469, 45.3182, 3.0, "umm_alqura", "الصومال"),
+        CityPreset("nouakchott", "نواكشوط", 18.0735, -15.9582, 0.0, "mwl", "موريتانيا"),
+
+        // تركيا وآسيا
+        CityPreset("istanbul", "إسطنبول", 41.0082, 28.9784, 3.0, "mwl", "تركيا"),
+        CityPreset("ankara", "أنقرة", 39.9334, 32.8597, 3.0, "mwl", "تركيا"),
+        CityPreset("islamabad", "إسلام آباد", 33.6844, 73.0479, 5.0, "karachi", "باكستان"),
+        CityPreset("karachi_city", "كراتشي", 24.8607, 67.0011, 5.0, "karachi", "باكستان"),
+        CityPreset("lahore", "لاهور", 31.5204, 74.3587, 5.0, "karachi", "باكستان"),
+        CityPreset("kuala_lumpur", "كوالالمبور", 3.1390, 101.6869, 8.0, "singapore", "ماليزيا"),
+        CityPreset("jakarta", "جاكرتا", -6.2088, 106.8456, 7.0, "singapore", "إندونيسيا"),
+        CityPreset("new_delhi", "نيودلهي", 28.6139, 77.2090, 5.5, "karachi", "الهند"),
+        CityPreset("dhaka", "دكا", 23.8103, 90.4125, 6.0, "karachi", "بنغلاديش"),
+
+        // أوروبا
+        CityPreset("london", "لندن", 51.5074, -0.1278, 1.0, "mwl", "بريطانيا"),
+        CityPreset("birmingham", "برمنغهام", 52.4862, -1.8904, 1.0, "mwl", "بريطانيا"),
+        CityPreset("paris", "باريس", 48.8566, 2.3522, 2.0, "mwl", "فرنسا"),
+        CityPreset("berlin", "برلين", 52.5200, 13.4050, 2.0, "mwl", "ألمانيا"),
+        CityPreset("frankfurt", "فرانكفورت", 50.1109, 8.6821, 2.0, "mwl", "ألمانيا"),
+        CityPreset("madrid", "مدريد", 40.4168, -3.7038, 2.0, "mwl", "إسبانيا"),
+        CityPreset("rome", "روما", 41.9028, 12.4964, 2.0, "mwl", "إيطاليا"),
+        CityPreset("moscow", "موسكو", 55.7558, 37.6173, 3.0, "mwl", "روسيا"),
+
+        // أمريكا الشمالية وأستراليا
+        CityPreset("newyork", "نيويورك", 40.7128, -74.0060, -4.0, "isna", "أمريكا"),
+        CityPreset("washington", "واشنطن", 38.9072, -77.0369, -4.0, "isna", "أمريكا"),
+        CityPreset("chicago", "شيكاغو", 41.8781, -87.6298, -5.0, "isna", "أمريكا"),
+        CityPreset("los_angeles", "لوس أنجلوس", 34.0522, -118.2437, -7.0, "isna", "أمريكا"),
+        CityPreset("toronto", "تورونتو", 43.6532, -79.3832, -4.0, "isna", "كندا"),
+        CityPreset("montreal", "مونتريال", 45.5017, -73.5673, -4.0, "isna", "كندا"),
+        CityPreset("sydney", "سيدني", -33.8688, 151.2093, 10.0, "mwl", "أستراليا"),
+        CityPreset("melbourne", "ملبورن", -37.8136, 144.9631, 10.0, "mwl", "أستراليا")
     )
 
     val calculationMethods = mapOf(
-        "umm_alqura" to "أم القرى (مكة المكرمة)",
-        "egypt" to "الهيئة المصرية العامة للمساحة",
-        "mwl" to "رابطة العالم الإسلامي",
-        "isna" to "الجمعية الإسلامية لأمريكا الشمالية"
+        "auto" to "تلقائي (حسب الدولة وإحداثيات GPS)",
+        "umm_alqura" to "أم القرى (مكة المكرمة والسعودية والخليج)",
+        "egypt" to "الهيئة المصرية العامة للمساحة (مصر وأفريقيا والشرق الأوسط)",
+        "mwl" to "رابطة العالم الإسلامي (أوروبا والعالم)",
+        "dubai" to "دائرة الشؤون الإسلامية بدبي (دولة الإمارات)",
+        "qatar" to "وزارة الأوقاف القطرية (دولة قطر)",
+        "kuwait" to "وزارة الأوقاف الكويتية (دولة الكويت)",
+        "isna" to "الجمعية الإسلامية لأمريكا الشمالية (ISNA)",
+        "karachi" to "جامعة العلوم الإسلامية بكراتشي (باكستان والهند)",
+        "singapore" to "المجلس الإسلامي بسنغافورة (MUIS / ماليزيا وإندونيسيا)",
+        "moon_sighting" to "لجنة رؤية الهلال العالمية (Moon Sighting)",
+        "tehran" to "معهد الجيوفيزياء بجامعة طهران"
     )
 }
+

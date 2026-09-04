@@ -1,4 +1,6 @@
 package com.example.ui.screens
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -11,7 +13,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.*
@@ -20,11 +25,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.example.data.AthkarData
 import com.example.data.DhikrItem
 import com.example.ui.AthkarUiState
@@ -36,19 +46,42 @@ import com.example.ui.theme.*
 fun HomeScreen(
     uiState: AthkarUiState,
     onCategorySelected: (String) -> Unit,
-    onDecrementDhikr: (String, String, Int) -> Unit
+    onDecrementDhikr: (String, String, Int) -> Unit,
+    onSendBroadcast: (String, String?, (Boolean, String) -> Unit) -> Unit = { _, _, _ -> }
 ) {
     var showCategorySheet by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
+    var secretTapCount by remember { mutableStateOf(0) }
+    var lastTapTime by remember { mutableStateOf(0L) }
+    var showSecretPinDialog by remember { mutableStateOf(false) }
+    var showBroadcastDialog by remember { mutableStateOf(false) }
+    var enteredPin by remember { mutableStateOf("") }
+    var broadcastText by remember { mutableStateOf("") }
+    var customFirebaseUrl by remember { mutableStateOf(com.example.data.FirebaseBroadcastManager.DEFAULT_FIREBASE_URL) }
+    var isSendingBroadcast by remember { mutableStateOf(false) }
+    var broadcastStatusMessage by remember { mutableStateOf<String?>(null) }
+
+    val haptic = LocalHapticFeedback.current
 
     val activeCategory = AthkarData.categories.find { it.id == uiState.activeCategory }
         ?: AthkarData.categories[0]
 
-    val dhikrs = AthkarData.getDhikrsForCategory(activeCategory.id)
+    val dhikrs = remember(activeCategory.id) { AthkarData.getDhikrsForCategory(activeCategory.id) }
     val remainingMap = uiState.remainingCounts[activeCategory.id] ?: emptyMap()
 
-    val completedCount = dhikrs.count { (remainingMap[it.id] ?: it.count) == 0 }
+    val completedCount = remember(dhikrs, remainingMap) {
+        dhikrs.count { (remainingMap[it.id] ?: it.count) == 0 }
+    }
     val totalCount = dhikrs.size
     val isCategoryDone = totalCount > 0 && completedCount == totalCount
+
+    val activeDhikrs = remember(dhikrs, remainingMap) {
+        dhikrs.filter { dhikr ->
+            val remaining = remainingMap[dhikr.id] ?: dhikr.count
+            remaining > 0
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -70,6 +103,23 @@ fun HomeScreen(
                         .clip(RoundedCornerShape(24.dp))
                         .background(CardSurface)
                         .border(1.dp, CardBorder.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            val now = System.currentTimeMillis()
+                            if (now - lastTapTime > 3500) {
+                                secretTapCount = 1
+                            } else {
+                                secretTapCount++
+                            }
+                            lastTapTime = now
+                            if (secretTapCount >= 7) {
+                                secretTapCount = 0
+                                enteredPin = ""
+                                showSecretPinDialog = true
+                            }
+                        }
                         .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -112,7 +162,10 @@ fun HomeScreen(
                                     .weight(1f)
                                     .clip(CircleShape)
                                     .background(if (isActive) AccentEmerald else Color.Transparent)
-                                    .clickable { onCategorySelected(id) }
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onCategorySelected(id)
+                                    }
                                     .padding(vertical = 10.dp)
                                     .testTag("segment_$id"),
                                 contentAlignment = Alignment.Center
@@ -130,7 +183,10 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.width(8.dp))
 
                     IconButton(
-                        onClick = { showCategorySheet = true },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showCategorySheet = true
+                        },
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
@@ -178,11 +234,6 @@ fun HomeScreen(
             }
 
             // Dhikr Cards List - Completed ones disappear immediately!
-            val activeDhikrs = dhikrs.filter { dhikr ->
-                val remaining = remainingMap[dhikr.id] ?: dhikr.count
-                remaining > 0
-            }
-
             items(activeDhikrs, key = { it.id }) { dhikr ->
                 val remaining = remainingMap[dhikr.id] ?: dhikr.count
                 DhikrCard(
@@ -247,73 +298,284 @@ fun HomeScreen(
 
         // Category Library Bottom Sheet
         if (showCategorySheet) {
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             ModalBottomSheet(
                 onDismissRequest = { showCategorySheet = false },
+                sheetState = sheetState,
                 containerColor = CardSurface,
-                scrimColor = Color.Black.copy(alpha = 0.6f)
+                dragHandle = {
+                    BottomSheetDefaults.DragHandle(color = GoldBright.copy(alpha = 0.5f))
+                }
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 22.dp, vertical = 12.dp)
                 ) {
                     Text(
                         text = "أقسام الأذكار والأدعية",
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.titleMedium,
                         color = GoldBright,
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold
                     )
 
-                    AthkarData.categories.forEach { cat ->
-                        val catDhikrs = AthkarData.getDhikrsForCategory(cat.id)
-                        val catRemaining = uiState.remainingCounts[cat.id] ?: emptyMap()
-                        val catCompleted = catDhikrs.count { (catRemaining[it.id] ?: it.count) == 0 }
+                    HorizontalDivider(color = CardBorder.copy(alpha = 0.5f), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                        val isSelected = uiState.activeCategory == cat.id
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 5.dp)
-                                .clip(CircleShape)
-                                .clickable {
-                                    onCategorySelected(cat.id)
-                                    showCategorySheet = false
-                                },
-                            shape = CircleShape,
-                            color = if (isSelected) GoldPrimary.copy(alpha = 0.15f) else CardSurfaceVariant.copy(alpha = 0.5f),
-                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, GoldBright) else androidx.compose.foundation.BorderStroke(0.5.dp, CardBorder)
-                        ) {
-                            Row(
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        AthkarData.categories.forEach { cat ->
+                            val catDhikrs = AthkarData.getDhikrsForCategory(cat.id)
+                            val catRemaining = uiState.remainingCounts[cat.id] ?: emptyMap()
+                            val catCompleted = catDhikrs.count { (catRemaining[it.id] ?: it.count) == 0 }
+
+                            val isSelected = uiState.activeCategory == cat.id
+                            Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(vertical = 5.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        coroutineScope.launch {
+                                            sheetState.hide()
+                                            onCategorySelected(cat.id)
+                                            showCategorySheet = false
+                                        }
+                                    },
+                                shape = RoundedCornerShape(18.dp),
+                                color = if (isSelected) GoldPrimary.copy(alpha = 0.15f) else CardSurfaceVariant.copy(alpha = 0.5f),
+                                border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, GoldBright) else androidx.compose.foundation.BorderStroke(0.5.dp, CardBorder)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = cat.name,
-                                        style = MaterialTheme.typography.titleLarge,
-                                        color = TextPrimary
-                                    )
-                                    Text(
-                                        text = "${cat.desc} (تم إكمال $catCompleted / ${catDhikrs.size})",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = TextSecondary
-                                    )
-                                }
-                                if (uiState.activeCategory == cat.id) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "نشط",
-                                        tint = GoldPrimary
-                                    )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = cat.name,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = if (isSelected) GoldBright else TextPrimary,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "نشط",
+                                            tint = GoldBright
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
+        }
+
+        // Secret PIN Verification Dialog
+        if (showSecretPinDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showSecretPinDialog = false
+                    enteredPin = ""
+                },
+                containerColor = CardSurface,
+                title = {
+                    Text(
+                        text = "رمز التحقق",
+                        color = GoldBright,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "يرجى كتابة رمز الدخول:",
+                            color = TextPrimary,
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = enteredPin,
+                            onValueChange = { enteredPin = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            placeholder = { Text("أدخل الرمز هنا", color = TextSecondary) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = GoldBright,
+                                unfocusedBorderColor = CardBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (enteredPin.trim() == "321465") {
+                                showSecretPinDialog = false
+                                enteredPin = ""
+                                broadcastStatusMessage = null
+                                showBroadcastDialog = true
+                            } else {
+                                // Close dialog on wrong pin
+                                showSecretPinDialog = false
+                                enteredPin = ""
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GoldPrimary,
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("تأكيد", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showSecretPinDialog = false
+                            enteredPin = ""
+                        }
+                    ) {
+                        Text("إلغاء", color = TextSecondary)
+                    }
+                }
+            )
+        }
+
+        // Secret Broadcast Message Dialog
+        if (showBroadcastDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    if (!isSendingBroadcast) {
+                        showBroadcastDialog = false
+                        broadcastStatusMessage = null
+                    }
+                },
+                containerColor = CardSurface,
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Campaign,
+                            contentDescription = null,
+                            tint = GoldBright,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "إرسال رسالة لجميع المستخدمين",
+                            color = GoldBright,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp
+                        )
+                    }
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "اكتب النص الذي ترغب في إرساله وسيتم نشره عبر Firebase Realtime Database ليظهر فوراً لجميع مستخدمي التطبيق:",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            lineHeight = 19.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = broadcastText,
+                            onValueChange = { broadcastText = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 110.dp),
+                            minLines = 3,
+                            maxLines = 6,
+                            placeholder = { Text("اكتب نص الرسالة هنا...", color = TextSecondary.copy(alpha = 0.7f)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = GoldBright,
+                                unfocusedBorderColor = CardBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(14.dp)
+                        )
+
+                        if (broadcastStatusMessage != null) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = broadcastStatusMessage ?: "",
+                                color = if (broadcastStatusMessage!!.contains("نجاح")) AccentEmerald else Color(0xFFFF6B6B),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (broadcastText.isNotBlank()) {
+                                isSendingBroadcast = true
+                                broadcastStatusMessage = "جارٍ الإرسال إلى Firebase Realtime Database..."
+                                val url = customFirebaseUrl.ifBlank { null }
+                                onSendBroadcast(broadcastText.trim(), url) { success, msg ->
+                                    isSendingBroadcast = false
+                                    broadcastStatusMessage = msg
+                                    if (success) {
+                                        coroutineScope.launch {
+                                            delay(1400)
+                                            showBroadcastDialog = false
+                                            broadcastText = ""
+                                            broadcastStatusMessage = null
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        enabled = broadcastText.isNotBlank() && !isSendingBroadcast,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GoldPrimary,
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (isSendingBroadcast) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = Color.Black,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        Text("إرسال", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            if (!isSendingBroadcast) {
+                                showBroadcastDialog = false
+                                broadcastStatusMessage = null
+                            }
+                        }
+                    ) {
+                        Text("إلغاء", color = TextSecondary)
+                    }
+                }
+            )
         }
     }
 }
@@ -325,12 +587,16 @@ fun DhikrCard(
     onClick: () -> Unit
 ) {
     val isCompleted = remaining == 0
+    val haptic = LocalHapticFeedback.current
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-            .clickable { onClick() }
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
             .testTag("dhikr_card_${dhikr.id}"),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(

@@ -1,8 +1,17 @@
 package com.example.ui.screens
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Check
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,22 +47,24 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.content.ContextCompat
 
-@OptIn(ExperimentalMaterial3Api::class)
+data class PrayerRowData(
+    val key: String,
+    val name: String,
+    val time: String,
+    val icon: ImageVector
+)
+
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PrayerTimesScreen(
     uiState: AthkarUiState,
-    onCitySelected: (String) -> Unit,
-    onMethodSelected: (String) -> Unit
+    onMethodSelected: (String) -> Unit,
+    onToggleMute: (String) -> Unit = {}
 ) {
-    var showCityPicker by remember { mutableStateOf(false) }
+    var showMuteDialog by remember { mutableStateOf(false) }
+    var selectedPrayerToToggle by remember { mutableStateOf<PrayerRowData?>(null) }
     val context = LocalContext.current
-
-    data class PrayerRowData(
-        val key: String,
-        val name: String,
-        val time: String,
-        val icon: ImageVector
-    )
+    val coroutineScope = rememberCoroutineScope()
 
     val prayerList = listOf(
         PrayerRowData("fajr", "الفجر", uiState.prayerTimes.fajr, Icons.Default.Star),
@@ -83,6 +94,121 @@ fun PrayerTimesScreen(
                     color = GoldBright,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
+            }
+
+            // Battery Optimization Warning
+            if (uiState.isBatteryOptimized) {
+                item {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
+                            .clip(RoundedCornerShape(16.dp)),
+                        color = Color(0x22FF5252),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x66FF5252))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "تحذير",
+                                tint = Color(0xFFFF5252),
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "تحسين البطارية مفعل",
+                                    color = Color(0xFFFF5252),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "قد يتسبب ذلك في تأخير الأذان. يرجى إيقافه.",
+                                    color = TextPrimary,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                            Button(
+                                onClick = {
+                                    try {
+                                        val intent = android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {}
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5252)),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Text("إصلاح", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Current Location Selector Card
+            item {
+                val currentLocName = if (uiState.customLocation != null) {
+                    uiState.customLocation.name
+                } else {
+                    val activeCity = AthkarData.presetCities.find { it.key == uiState.selectedCityKey }
+                    activeCity?.name ?: "مكة المكرمة"
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                        .clip(RoundedCornerShape(20.dp)),
+                    color = CardSurfaceVariant.copy(alpha = 0.5f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = CircleShape,
+                                color = GoldPrimary.copy(alpha = 0.15f),
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        tint = GoldBright,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "موقع حساب المواقيت الحالي",
+                                    fontSize = 11.sp,
+                                    color = TextSecondary
+                                )
+                                Text(
+                                    text = currentLocName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = GoldBright,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             // Adhan Stopwatch Display - Styled Box with Hours first then Minutes
@@ -210,7 +336,14 @@ fun PrayerTimesScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 4.dp)
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = {
+                                selectedPrayerToToggle = prayer
+                                showMuteDialog = true
+                            }
+                        ),
                     shape = RoundedCornerShape(22.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isNext) CardSurfaceVariant else CardSurface
@@ -236,6 +369,22 @@ fun PrayerTimesScreen(
                                 style = MaterialTheme.typography.titleMedium,
                                 color = if (isNext) GoldBright else TextPrimary
                             )
+                            if (uiState.mutedPrayers.contains(prayer.key)) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(0x33FF8A8A),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF8A8A))
+                                ) {
+                                    Text(
+                                        text = "مكتوم",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFFF8A8A)
+                                    )
+                                }
+                            }
                             if (isNext) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Surface(
@@ -264,65 +413,52 @@ fun PrayerTimesScreen(
             }
         }
 
-        // City Selector Bottom Sheet
-        if (showCityPicker) {
-            ModalBottomSheet(
-                onDismissRequest = { showCityPicker = false },
+        // Mute/Unmute Confirmation Dialog
+        val localPrayer = selectedPrayerToToggle
+        if (showMuteDialog && localPrayer != null) {
+            val isMuted = uiState.mutedPrayers.contains(localPrayer.key)
+
+            AlertDialog(
+                onDismissRequest = { showMuteDialog = false },
                 containerColor = CardSurface,
-                scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
+                title = {
                     Text(
-                        text = "اختر المدينة لحساب أوقات الصلاة",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = GoldBright,
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        text = if (isMuted) "تفعيل صوت الأذان" else "إيقاف صوت الأذان",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = GoldBright
                     )
-
-                    AthkarData.presetCities.forEach { city ->
-                        val isSelected = uiState.selectedCityKey == city.key && uiState.customLocation == null
-
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    onCitySelected(city.key)
-                                    showCityPicker = false
-                                },
-                            color = if (isSelected) CardSurfaceVariant else androidx.compose.ui.graphics.Color.Transparent,
-                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary) else null
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = city.name,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = TextPrimary,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.LocationOn,
-                                        contentDescription = "محدد",
-                                        tint = GoldPrimary
-                                    )
-                                }
-                            }
+                },
+                text = {
+                    Text(
+                        text = if (isMuted) {
+                            "هل تريد إعادة تفعيل صوت الأذان لصلاة ${localPrayer.name}؟"
+                        } else {
+                            "هل تريد إيقاف وكتم صوت الأذان لصلاة ${localPrayer.name}؟"
+                        },
+                        color = TextPrimary
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            onToggleMute(localPrayer.key)
+                            showMuteDialog = false
+                            selectedPrayerToToggle = null
                         }
+                    ) {
+                        Text(
+                            text = if (isMuted) "تفعيل الصوت" else "إيقاف الصوت",
+                            color = GoldPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
+                },
+                dismissButton = {
+                    TextButton(onClick = { showMuteDialog = false }) {
+                        Text("إلغاء", color = TextSecondary)
+                    }
                 }
-            }
+            )
         }
     }
 }

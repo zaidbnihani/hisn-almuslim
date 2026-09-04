@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -12,8 +13,8 @@ android {
         applicationId = "com.aistudio.athkar.azkari"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "2.0.0"
+        versionCode = 8
+        versionName = "2.2.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -48,6 +49,11 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    aaptOptions {
+        noCompress("mp3")
     }
 }
 
@@ -59,6 +65,7 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
+    implementation("androidx.compose.animation:animation")
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     // implementation(libs.androidx.material.icons.extended)
@@ -66,6 +73,25 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.batoulapps.adhan)
     implementation(libs.play.services.location)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.gson)
+
+    // Media3 ExoPlayer for Radio Streaming
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-session:1.4.1")
+    implementation("androidx.media:media:1.7.0")
+
+    // Material Icons Extended
+    implementation("androidx.compose.material:material-icons-extended")
+
+    // Coil for Mushaf image loading & caching
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Firebase BoM & services
+    implementation(platform("com.google.firebase:firebase-bom:33.10.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-database")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

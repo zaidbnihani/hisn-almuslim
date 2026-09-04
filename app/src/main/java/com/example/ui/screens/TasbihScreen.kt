@@ -1,11 +1,15 @@
 package com.example.ui.screens
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +27,9 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,13 +50,17 @@ fun TasbihScreen(
 ) {
     var showPhraseSheet by remember { mutableStateOf(false) }
     var isPressed by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     val activePhrase = AthkarData.tasbihPhrases.getOrNull(uiState.activeTasbihIndex)
         ?: AthkarData.tasbihPhrases[0]
 
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.93f else 1.0f,
-        animationSpec = tween(durationMillis = 100),
+        targetValue = if (isPressed) 0.94f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessHigh
+        ),
         label = "tasbihScale"
     )
 
@@ -110,13 +121,16 @@ fun TasbihScreen(
                     .scale(scale)
                     .clip(CircleShape)
                     .background(CardSurface)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        isPressed = true
-                        onIncrementTasbih()
-                        isPressed = false
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = {
+                                isPressed = true
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onIncrementTasbih()
+                                tryAwaitRelease()
+                                isPressed = false
+                            }
+                        )
                     }
                     .testTag("tasbih_counter_circle"),
                 contentAlignment = Alignment.Center
@@ -205,7 +219,10 @@ fun TasbihScreen(
 
             // Reset Button
             Button(
-                onClick = onResetTasbih,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onResetTasbih()
+                },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CardSurfaceVariant,
                     contentColor = TextPrimary
@@ -233,73 +250,94 @@ fun TasbihScreen(
             Spacer(modifier = Modifier.height(72.dp))
         }
 
-        // Phrase Selector Bottom Sheet
+        // Phrase Selector Dialog
         if (showPhraseSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showPhraseSheet = false },
-                containerColor = CardSurface,
-                scrimColor = Color.Black.copy(alpha = 0.6f)
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { showPhraseSheet = false }
             ) {
-                Column(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(horizontal = 8.dp, vertical = 24.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardSurface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
                 ) {
-                    Text(
-                        text = "اختر الذكر النشط للسبحة",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = GoldBright,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp)
+                    ) {
+                        Text(
+                            text = "اختر الذكر النشط للسبحة",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = GoldBright,
+                            modifier = Modifier.padding(bottom = 16.dp),
+                            textAlign = TextAlign.Center
+                        )
 
-                    LazyColumn {
-                        items(AthkarData.tasbihPhrases.size) { idx ->
-                            val phrase = AthkarData.tasbihPhrases[idx]
-                            val isSelected = uiState.activeTasbihIndex == idx
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f, fill = false)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            AthkarData.tasbihPhrases.forEachIndexed { idx, phrase ->
+                                val isSelected = uiState.activeTasbihIndex == idx
 
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clip(CircleShape)
-                                    .clickable {
-                                        onSelectPhrase(idx)
-                                        showPhraseSheet = false
-                                    },
-                                shape = CircleShape,
-                                color = if (isSelected) GoldPrimary.copy(alpha = 0.15f) else CardSurfaceVariant.copy(alpha = 0.4f),
-                                border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, GoldBright) else androidx.compose.foundation.BorderStroke(0.5.dp, CardBorder)
-                            ) {
-                                Row(
+                                Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .padding(vertical = 4.dp)
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            onSelectPhrase(idx)
+                                            showPhraseSheet = false
+                                        },
+                                    shape = CircleShape,
+                                    color = if (isSelected) GoldPrimary.copy(alpha = 0.15f) else CardSurfaceVariant.copy(alpha = 0.4f),
+                                    border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, GoldBright) else androidx.compose.foundation.BorderStroke(0.5.dp, CardBorder)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = phrase.text,
-                                            style = MaterialTheme.typography.titleLarge,
-                                            color = TextPrimary
-                                        )
-                                        Text(
-                                            text = "العدد المستهدف: ${phrase.target}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = TextSecondary
-                                        )
-                                    }
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = "نشط",
-                                            tint = GoldPrimary
-                                        )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = phrase.text,
+                                                style = MaterialTheme.typography.titleLarge,
+                                                color = TextPrimary
+                                            )
+                                            Text(
+                                                text = "العدد المستهدف: ${phrase.target}",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = TextSecondary
+                                            )
+                                        }
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "نشط",
+                                                tint = GoldPrimary
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Button(
+                            onClick = { showPhraseSheet = false },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary)
+                        ) {
+                            Text("إغلاق", color = DarkCanvas, fontWeight = FontWeight.Bold)
+                        }
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }

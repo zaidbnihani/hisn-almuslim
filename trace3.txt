@@ -1,0 +1,270 @@
+151 OPEN 1 class MainActivity : ComponentActivity() {
+156 OPEN 2     private fun speakText(text: String) {
+157 OPEN 3         if (textToSpeech == null) {
+158 OPEN 4             textToSpeech = android.speech.tts.TextToSpeech(this) { status ->
+159 OPEN 5                 if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+162 CLOSE 5                 }
+163 CLOSE 4             }
+164 CLOSE 3         } else {
+164 OPEN 3         } else {
+166 CLOSE 3         }
+167 CLOSE 2     }
+169 OPEN 2     override fun onDestroy() {
+170 OPEN 3         try {
+173 CLOSE 3         } catch (_: Exception) {}
+173 OPEN 3         } catch (_: Exception) {}
+173 CLOSE 3         } catch (_: Exception) {}
+175 CLOSE 2     }
+177 OPEN 2     override fun onCreate(savedInstanceState: Bundle?) {
+181 OPEN 3         try {
+182 OPEN 4             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+183 OPEN 5                 window.insetsController?.let { controller ->
+186 CLOSE 5                 }
+187 CLOSE 4             } else {
+187 OPEN 4             } else {
+192 CLOSE 4             }
+193 CLOSE 3         } catch (_: Exception) {}
+193 OPEN 3         } catch (_: Exception) {}
+193 CLOSE 3         } catch (_: Exception) {}
+195 OPEN 3         setContent {
+196 OPEN 4             AthkarTheme {
+202 OPEN 5                 ) { permissions ->
+205 OPEN 6                     if (locationGranted) {
+206 OPEN 7                         try {
+208 OPEN 8                             fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
+209 OPEN 9                                 if (loc != null) {
+211 CLOSE 9                                 }
+212 CLOSE 8                             }
+213 CLOSE 7                         } catch (_: Exception) {}
+213 OPEN 7                         } catch (_: Exception) {}
+213 CLOSE 7                         } catch (_: Exception) {}
+214 CLOSE 6                     }
+215 CLOSE 5                 }
+217 OPEN 5                 LaunchedEffect(Unit) {
+219 OPEN 6                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+220 OPEN 7                         if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+222 CLOSE 7                         }
+223 CLOSE 6                     }
+224 OPEN 6                     if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+227 CLOSE 6                     }
+228 OPEN 6                     if (permissionsToRequest.isNotEmpty()) {
+230 CLOSE 6                     } else {
+230 OPEN 6                     } else {
+231 OPEN 7                         try {
+233 OPEN 8                             fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
+234 OPEN 9                                 if (loc != null) {
+236 CLOSE 9                                 }
+237 CLOSE 8                             }
+238 CLOSE 7                         } catch (_: Exception) {}
+238 OPEN 7                         } catch (_: Exception) {}
+238 CLOSE 7                         } catch (_: Exception) {}
+239 CLOSE 6                     }
+242 OPEN 6                     try {
+244 OPEN 7                         if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(packageName)) {
+245 OPEN 8                             val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+247 CLOSE 8                             }
+249 CLOSE 7                         }
+250 CLOSE 6                     } catch (_: Exception) {}
+250 OPEN 6                     } catch (_: Exception) {}
+250 CLOSE 6                     } catch (_: Exception) {}
+253 OPEN 6                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+255 OPEN 7                         if (alarmManager?.canScheduleExactAlarms() == false) {
+256 OPEN 8                             try {
+257 OPEN 9                                 val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+259 CLOSE 9                                 }
+261 CLOSE 8                             } catch (_: Exception) {}
+261 OPEN 8                             } catch (_: Exception) {}
+261 CLOSE 8                             } catch (_: Exception) {}
+262 CLOSE 7                         }
+263 CLOSE 6                     }
+264 CLOSE 5                 }
+267 OPEN 5                 LaunchedEffect(activeAthkarNotif) {
+268 OPEN 6                     if (activeAthkarNotif != null) {
+275 OPEN 7                         val voiceMsg = when (activeAthkarNotif.categoryId) {
+280 CLOSE 7                         }
+283 CLOSE 6                     }
+284 CLOSE 5                 }
+287 OPEN 5                 val currentMuezzin = remember(uiState.selectedMuezzinId) {
+288 OPEN 6                     AthkarData.muezzinsList.find { it.id == uiState.selectedMuezzinId } ?: AthkarData.muezzinsList[0]
+288 CLOSE 6                     AthkarData.muezzinsList.find { it.id == uiState.selectedMuezzinId } ?: AthkarData.muezzinsList[0]
+289 CLOSE 5                 }
+291 OPEN 5                 LaunchedEffect(activeAdhanName, currentMuezzin) {
+292 OPEN 6                     if (activeAdhanName != null) {
+294 OPEN 7                         val serviceIntent = android.content.Intent(this@MainActivity, com.example.service.AdhanForegroundService::class.java).apply {
+298 CLOSE 7                         }
+299 OPEN 7                         try {
+300 OPEN 8                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+302 CLOSE 8                             } else {
+302 OPEN 8                             } else {
+304 CLOSE 8                             }
+305 CLOSE 7                         } catch (e: Exception) {
+305 OPEN 7                         } catch (e: Exception) {
+307 CLOSE 7                         }
+308 CLOSE 6                     } else {
+308 OPEN 6                     } else {
+309 OPEN 7                         val stopIntent = android.content.Intent(this@MainActivity, com.example.service.AdhanForegroundService::class.java).apply {
+311 CLOSE 7                         }
+313 CLOSE 6                     }
+314 CLOSE 5                 }
+316 OPEN 5                 DisposableEffect(Unit) {
+317 OPEN 6                     val receiver = object : android.content.BroadcastReceiver() {
+318 OPEN 7                         override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+319 OPEN 8                             if (intent.action == com.example.service.AdhanForegroundService.ACTION_ADHAN_STOPPED) {
+321 CLOSE 8                             }
+322 CLOSE 7                         }
+323 CLOSE 6                     }
+325 OPEN 6                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+327 CLOSE 6                     } else {
+327 OPEN 6                     } else {
+329 CLOSE 6                     }
+330 OPEN 6                     onDispose {
+331 OPEN 7                         try {
+333 CLOSE 7                         } catch (_: Exception) {}
+333 OPEN 7                         } catch (_: Exception) {}
+333 CLOSE 7                         } catch (_: Exception) {}
+334 CLOSE 6                     }
+335 CLOSE 5                 }
+347 OPEN 5                 Box(modifier = Modifier.fillMaxSize()) {
+356 OPEN 6                         bottomBar = {
+362 OPEN 7                             ) {
+367 OPEN 8                                 ) {
+383 OPEN 9                                     ) {
+390 OPEN 10                                         ) {
+394 OPEN 11                                             items.forEachIndexed { index, screen ->
+404 OPEN 12                                                         .clickable {
+405 OPEN 13                                                             if (currentRoute != screen.route) {
+406 OPEN 14                                                                 navController.navigate(screen.route) {
+407 OPEN 15                                                                     popUpTo(navController.graph.findStartDestination().id) {
+409 CLOSE 15                                                                     }
+412 CLOSE 14                                                                 }
+413 CLOSE 13                                                             }
+414 CLOSE 12                                                         }
+416 OPEN 12                                                         .testTag("nav_item_${screen.route}"),
+416 CLOSE 12                                                         .testTag("nav_item_${screen.route}"),
+418 OPEN 12                                                 ) {
+422 OPEN 13                                                     ) {
+437 CLOSE 13                                                     }
+438 CLOSE 12                                                 }
+439 CLOSE 11                                             }
+440 CLOSE 10                                         }
+441 CLOSE 9                                     }
+442 CLOSE 8                                 }
+443 CLOSE 7                             }
+444 CLOSE 6                         }
+445 OPEN 6                     ) { innerPadding ->
+450 OPEN 7                         enterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { it / 6 } },
+450 OPEN 8                         enterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { it / 6 } },
+450 CLOSE 8                         enterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { it / 6 } },
+450 CLOSE 7                         enterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { it / 6 } },
+451 OPEN 7                         exitTransition = { fadeOut(animationSpec = tween(200)) },
+451 CLOSE 7                         exitTransition = { fadeOut(animationSpec = tween(200)) },
+452 OPEN 7                         popEnterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { -it / 6 } },
+452 OPEN 8                         popEnterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { -it / 6 } },
+452 CLOSE 8                         popEnterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { -it / 6 } },
+452 CLOSE 7                         popEnterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { -it / 6 } },
+453 OPEN 7                         popExitTransition = { fadeOut(animationSpec = tween(200)) }
+453 CLOSE 7                         popExitTransition = { fadeOut(animationSpec = tween(200)) }
+454 OPEN 7                     ) {
+455 OPEN 8                         composable(Screen.Home.route) {
+458 OPEN 9                                 onCategorySelected = { viewModel.selectCategory(it) },
+458 CLOSE 9                                 onCategorySelected = { viewModel.selectCategory(it) },
+459 OPEN 9                                 onDecrementDhikr = { catId, dhikrId, maxCount ->
+461 CLOSE 9                                 }
+463 CLOSE 8                         }
+465 OPEN 8                         composable(Screen.Tasbih.route) {
+468 OPEN 9                                 onIncrementTasbih = { viewModel.incrementTasbih() },
+468 CLOSE 9                                 onIncrementTasbih = { viewModel.incrementTasbih() },
+469 OPEN 9                                 onResetTasbih = { viewModel.resetCurrentTasbih() },
+469 CLOSE 9                                 onResetTasbih = { viewModel.resetCurrentTasbih() },
+470 OPEN 9                                 onSelectPhrase = { viewModel.selectTasbihPhrase(it) }
+470 CLOSE 9                                 onSelectPhrase = { viewModel.selectTasbihPhrase(it) }
+472 CLOSE 8                         }
+474 OPEN 8                         composable(Screen.Prayer.route) {
+477 OPEN 9                                 onCitySelected = { viewModel.selectCity(it) },
+477 CLOSE 9                                 onCitySelected = { viewModel.selectCity(it) },
+478 OPEN 9                                 onMethodSelected = { viewModel.selectMethod(it) },
+478 CLOSE 9                                 onMethodSelected = { viewModel.selectMethod(it) },
+479 OPEN 9                                 onToggleMute = { viewModel.togglePrayerMute(it) }
+479 CLOSE 9                                 onToggleMute = { viewModel.togglePrayerMute(it) }
+481 CLOSE 8                         }
+483 OPEN 8                         composable(Screen.Radio.route) {
+484 OPEN 9                             QuranRadioScreen(onBackClick = { navController.popBackStack() })
+484 CLOSE 9                             QuranRadioScreen(onBackClick = { navController.popBackStack() })
+485 CLOSE 8                         }
+486 OPEN 8                         composable(Screen.Fortress.route) {
+489 OPEN 9                                 onQueryChanged = { viewModel.updateFortressQuery(it) }
+489 CLOSE 9                                 onQueryChanged = { viewModel.updateFortressQuery(it) }
+491 CLOSE 8                         }
+493 OPEN 8                         composable(Screen.Convert.route) {
+496 OPEN 9                                 onDateChanged = { y, m, d -> viewModel.updateConvertDate(y, m, d) }
+496 CLOSE 9                                 onDateChanged = { y, m, d -> viewModel.updateConvertDate(y, m, d) }
+498 CLOSE 8                         }
+500 OPEN 8                         composable(Screen.Settings.route) {
+503 OPEN 9                                 onToggleSound = { viewModel.toggleSound() },
+503 CLOSE 9                                 onToggleSound = { viewModel.toggleSound() },
+504 OPEN 9                                 onToggleNotifications = { viewModel.toggleNotifications() },
+504 CLOSE 9                                 onToggleNotifications = { viewModel.toggleNotifications() },
+505 OPEN 9                                 onToggleMorningAthkar = { viewModel.toggleMorningAthkarNotify() },
+505 CLOSE 9                                 onToggleMorningAthkar = { viewModel.toggleMorningAthkarNotify() },
+506 OPEN 9                                 onToggleEveningAthkar = { viewModel.toggleEveningAthkarNotify() },
+506 CLOSE 9                                 onToggleEveningAthkar = { viewModel.toggleEveningAthkarNotify() },
+507 OPEN 9                                 onToggleSleepAthkar = { viewModel.toggleSleepAthkarNotify() },
+507 CLOSE 9                                 onToggleSleepAthkar = { viewModel.toggleSleepAthkarNotify() },
+508 OPEN 9                                 onMethodSelected = { viewModel.selectMethod(it) },
+508 CLOSE 9                                 onMethodSelected = { viewModel.selectMethod(it) },
+509 OPEN 9                                 onSetCustomLocation = { lat, lon, name -> viewModel.setCustomLocation(lat, lon, name) },
+509 CLOSE 9                                 onSetCustomLocation = { lat, lon, name -> viewModel.setCustomLocation(lat, lon, name) },
+510 OPEN 9                                 onResetAll = { viewModel.resetAllData() },
+510 CLOSE 9                                 onResetAll = { viewModel.resetAllData() },
+511 OPEN 9                                 onSelectMuezzin = { viewModel.selectMuezzin(it) }
+511 CLOSE 9                                 onSelectMuezzin = { viewModel.selectMuezzin(it) }
+513 CLOSE 8                         }
+514 CLOSE 7                     }
+515 CLOSE 6                 }
+518 OPEN 6                 if (activeAdhanName != null) {
+523 OPEN 7                             .clickable(enabled = false) {},
+523 CLOSE 7                             .clickable(enabled = false) {},
+525 OPEN 7                     ) {
+530 OPEN 8                         ) {
+533 OPEN 9                             ) {
+555 OPEN 10                                     text = "حسب التوقيت المحلي لمدينة ${AthkarData.presetCities.find { it.key == uiState.selectedCityKey }?.name ?: ""}",
+555 OPEN 11                                     text = "حسب التوقيت المحلي لمدينة ${AthkarData.presetCities.find { it.key == uiState.selectedCityKey }?.name ?: ""}",
+555 CLOSE 11                                     text = "حسب التوقيت المحلي لمدينة ${AthkarData.presetCities.find { it.key == uiState.selectedCityKey }?.name ?: ""}",
+555 CLOSE 10                                     text = "حسب التوقيت المحلي لمدينة ${AthkarData.presetCities.find { it.key == uiState.selectedCityKey }?.name ?: ""}",
+565 OPEN 10                                     text = "بصوت: ${currentMuezzin.name}",
+565 CLOSE 10                                     text = "بصوت: ${currentMuezzin.name}",
+574 OPEN 10                                     onClick = { viewModel.stopAdhan() },
+574 CLOSE 10                                     onClick = { viewModel.stopAdhan() },
+583 OPEN 10                                 ) {
+589 CLOSE 10                                 }
+590 CLOSE 9                             }
+591 CLOSE 8                         }
+592 CLOSE 7                     }
+594 CLOSE 6                 }
+597 OPEN 6                 if (uiState.showPrivacyGate) {
+601 OPEN 7                         onAccept = {
+603 CLOSE 7                         },
+604 OPEN 7                         onDecline = {
+606 CLOSE 7                         }
+608 CLOSE 6                 }
+609 CLOSE 5             }
+610 CLOSE 4         }
+611 CLOSE 3     }
+612 CLOSE 2 }
+614 OPEN 2     private fun showPrayerNotification(context: android.content.Context, prayerName: String) {
+618 OPEN 3         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+623 OPEN 4             ).apply {
+628 CLOSE 4             }
+630 CLOSE 3         }
+632 OPEN 3         val intent = android.content.Intent(context, MainActivity::class.java).apply {
+634 CLOSE 3         }
+653 CLOSE 2     }
+655 OPEN 2     private fun showAthkarNotification(context: android.content.Context, title: String, body: String, categoryId: String) {
+659 OPEN 3         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+664 OPEN 4             ).apply {
+668 CLOSE 4             }
+670 CLOSE 3         }
+672 OPEN 3         val intent = android.content.Intent(context, MainActivity::class.java).apply {
+675 CLOSE 3         }
+694 CLOSE 2     }
+695 CLOSE 1 }

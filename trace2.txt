@@ -1,0 +1,228 @@
+193 CLOSE          } catch (_: Exception) {}
+193 OPEN 0         } catch (_: Exception) {}
+193 CLOSE 0         } catch (_: Exception) {}
+195 OPEN 0         setContent {
+196 OPEN 1             AthkarTheme {
+202 OPEN 2                 ) { permissions ->
+205 OPEN 3                     if (locationGranted) {
+206 OPEN 4                         try {
+208 OPEN 5                             fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
+209 OPEN 6                                 if (loc != null) {
+211 CLOSE 6                                 }
+212 CLOSE 5                             }
+213 CLOSE 4                         } catch (_: Exception) {}
+213 OPEN 4                         } catch (_: Exception) {}
+213 CLOSE 4                         } catch (_: Exception) {}
+214 CLOSE 3                     }
+215 CLOSE 2                 }
+217 OPEN 2                 LaunchedEffect(Unit) {
+219 OPEN 3                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+220 OPEN 4                         if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+222 CLOSE 4                         }
+223 CLOSE 3                     }
+224 OPEN 3                     if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+227 CLOSE 3                     }
+228 OPEN 3                     if (permissionsToRequest.isNotEmpty()) {
+230 CLOSE 3                     } else {
+230 OPEN 3                     } else {
+231 OPEN 4                         try {
+233 OPEN 5                             fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
+234 OPEN 6                                 if (loc != null) {
+236 CLOSE 6                                 }
+237 CLOSE 5                             }
+238 CLOSE 4                         } catch (_: Exception) {}
+238 OPEN 4                         } catch (_: Exception) {}
+238 CLOSE 4                         } catch (_: Exception) {}
+239 CLOSE 3                     }
+242 OPEN 3                     try {
+244 OPEN 4                         if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(packageName)) {
+245 OPEN 5                             val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+247 CLOSE 5                             }
+249 CLOSE 4                         }
+250 CLOSE 3                     } catch (_: Exception) {}
+250 OPEN 3                     } catch (_: Exception) {}
+250 CLOSE 3                     } catch (_: Exception) {}
+253 OPEN 3                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+255 OPEN 4                         if (alarmManager?.canScheduleExactAlarms() == false) {
+256 OPEN 5                             try {
+257 OPEN 6                                 val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+259 CLOSE 6                                 }
+261 CLOSE 5                             } catch (_: Exception) {}
+261 OPEN 5                             } catch (_: Exception) {}
+261 CLOSE 5                             } catch (_: Exception) {}
+262 CLOSE 4                         }
+263 CLOSE 3                     }
+264 CLOSE 2                 }
+267 OPEN 2                 LaunchedEffect(activeAthkarNotif) {
+268 OPEN 3                     if (activeAthkarNotif != null) {
+275 OPEN 4                         val voiceMsg = when (activeAthkarNotif.categoryId) {
+280 CLOSE 4                         }
+283 CLOSE 3                     }
+284 CLOSE 2                 }
+287 OPEN 2                 val currentMuezzin = remember(uiState.selectedMuezzinId) {
+288 OPEN 3                     AthkarData.muezzinsList.find { it.id == uiState.selectedMuezzinId } ?: AthkarData.muezzinsList[0]
+288 CLOSE 3                     AthkarData.muezzinsList.find { it.id == uiState.selectedMuezzinId } ?: AthkarData.muezzinsList[0]
+289 CLOSE 2                 }
+291 OPEN 2                 LaunchedEffect(activeAdhanName, currentMuezzin) {
+292 OPEN 3                     if (activeAdhanName != null) {
+294 OPEN 4                         val serviceIntent = android.content.Intent(this@MainActivity, com.example.service.AdhanForegroundService::class.java).apply {
+298 CLOSE 4                         }
+299 OPEN 4                         try {
+300 OPEN 5                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+302 CLOSE 5                             } else {
+302 OPEN 5                             } else {
+304 CLOSE 5                             }
+305 CLOSE 4                         } catch (e: Exception) {
+305 OPEN 4                         } catch (e: Exception) {
+307 CLOSE 4                         }
+308 CLOSE 3                     } else {
+308 OPEN 3                     } else {
+309 OPEN 4                         val stopIntent = android.content.Intent(this@MainActivity, com.example.service.AdhanForegroundService::class.java).apply {
+311 CLOSE 4                         }
+313 CLOSE 3                     }
+314 CLOSE 2                 }
+316 OPEN 2                 DisposableEffect(Unit) {
+317 OPEN 3                     val receiver = object : android.content.BroadcastReceiver() {
+318 OPEN 4                         override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+319 OPEN 5                             if (intent.action == com.example.service.AdhanForegroundService.ACTION_ADHAN_STOPPED) {
+321 CLOSE 5                             }
+322 CLOSE 4                         }
+323 CLOSE 3                     }
+325 OPEN 3                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+327 CLOSE 3                     } else {
+327 OPEN 3                     } else {
+329 CLOSE 3                     }
+330 OPEN 3                     onDispose {
+331 OPEN 4                         try {
+333 CLOSE 4                         } catch (_: Exception) {}
+333 OPEN 4                         } catch (_: Exception) {}
+333 CLOSE 4                         } catch (_: Exception) {}
+334 CLOSE 3                     }
+335 CLOSE 2                 }
+347 OPEN 2                 Box(modifier = Modifier.fillMaxSize()) {
+356 OPEN 3                         bottomBar = {
+362 OPEN 4                             ) {
+367 OPEN 5                                 ) {
+383 OPEN 6                                     ) {
+390 OPEN 7                                         ) {
+394 OPEN 8                                             items.forEachIndexed { index, screen ->
+404 OPEN 9                                                         .clickable {
+405 OPEN 10                                                             if (currentRoute != screen.route) {
+406 OPEN 11                                                                 navController.navigate(screen.route) {
+407 OPEN 12                                                                     popUpTo(navController.graph.findStartDestination().id) {
+409 CLOSE 12                                                                     }
+412 CLOSE 11                                                                 }
+413 CLOSE 10                                                             }
+414 CLOSE 9                                                         }
+416 OPEN 9                                                         .testTag("nav_item_${screen.route}"),
+416 CLOSE 9                                                         .testTag("nav_item_${screen.route}"),
+418 OPEN 9                                                 ) {
+422 OPEN 10                                                     ) {
+437 CLOSE 10                                                     }
+438 CLOSE 9                                                 }
+439 CLOSE 8                                             }
+440 CLOSE 7                                         }
+441 CLOSE 6                                     }
+442 CLOSE 5                                 }
+443 CLOSE 4                             }
+444 CLOSE 3                         }
+445 OPEN 3                     ) { innerPadding ->
+450 OPEN 4                         enterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { it / 6 } },
+450 OPEN 5                         enterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { it / 6 } },
+450 CLOSE 5                         enterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { it / 6 } },
+450 CLOSE 4                         enterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { it / 6 } },
+451 OPEN 4                         exitTransition = { fadeOut(animationSpec = tween(200)) },
+451 CLOSE 4                         exitTransition = { fadeOut(animationSpec = tween(200)) },
+452 OPEN 4                         popEnterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { -it / 6 } },
+452 OPEN 5                         popEnterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { -it / 6 } },
+452 CLOSE 5                         popEnterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { -it / 6 } },
+452 CLOSE 4                         popEnterTransition = { fadeIn(animationSpec = tween(280)) + slideInHorizontally(animationSpec = tween(280)) { -it / 6 } },
+453 OPEN 4                         popExitTransition = { fadeOut(animationSpec = tween(200)) }
+453 CLOSE 4                         popExitTransition = { fadeOut(animationSpec = tween(200)) }
+454 OPEN 4                     ) {
+455 OPEN 5                         composable(Screen.Home.route) {
+458 OPEN 6                                 onCategorySelected = { viewModel.selectCategory(it) },
+458 CLOSE 6                                 onCategorySelected = { viewModel.selectCategory(it) },
+459 OPEN 6                                 onDecrementDhikr = { catId, dhikrId, maxCount ->
+461 CLOSE 6                                 }
+463 CLOSE 5                         }
+465 OPEN 5                         composable(Screen.Tasbih.route) {
+468 OPEN 6                                 onIncrementTasbih = { viewModel.incrementTasbih() },
+468 CLOSE 6                                 onIncrementTasbih = { viewModel.incrementTasbih() },
+469 OPEN 6                                 onResetTasbih = { viewModel.resetCurrentTasbih() },
+469 CLOSE 6                                 onResetTasbih = { viewModel.resetCurrentTasbih() },
+470 OPEN 6                                 onSelectPhrase = { viewModel.selectTasbihPhrase(it) }
+470 CLOSE 6                                 onSelectPhrase = { viewModel.selectTasbihPhrase(it) }
+472 CLOSE 5                         }
+474 OPEN 5                         composable(Screen.Prayer.route) {
+477 OPEN 6                                 onCitySelected = { viewModel.selectCity(it) },
+477 CLOSE 6                                 onCitySelected = { viewModel.selectCity(it) },
+478 OPEN 6                                 onMethodSelected = { viewModel.selectMethod(it) },
+478 CLOSE 6                                 onMethodSelected = { viewModel.selectMethod(it) },
+479 OPEN 6                                 onToggleMute = { viewModel.togglePrayerMute(it) }
+479 CLOSE 6                                 onToggleMute = { viewModel.togglePrayerMute(it) }
+481 CLOSE 5                         }
+483 OPEN 5                         composable(Screen.Radio.route) {
+484 OPEN 6                             QuranRadioScreen(onBackClick = { navController.popBackStack() })
+484 CLOSE 6                             QuranRadioScreen(onBackClick = { navController.popBackStack() })
+485 CLOSE 5                         }
+486 OPEN 5                         composable(Screen.Fortress.route) {
+489 OPEN 6                                 onQueryChanged = { viewModel.updateFortressQuery(it) }
+489 CLOSE 6                                 onQueryChanged = { viewModel.updateFortressQuery(it) }
+491 CLOSE 5                         }
+493 OPEN 5                         composable(Screen.Convert.route) {
+496 OPEN 6                                 onDateChanged = { y, m, d -> viewModel.updateConvertDate(y, m, d) }
+496 CLOSE 6                                 onDateChanged = { y, m, d -> viewModel.updateConvertDate(y, m, d) }
+498 CLOSE 5                         }
+500 OPEN 5                         composable(Screen.Settings.route) {
+503 OPEN 6                                 onToggleSound = { viewModel.toggleSound() },
+503 CLOSE 6                                 onToggleSound = { viewModel.toggleSound() },
+504 OPEN 6                                 onToggleNotifications = { viewModel.toggleNotifications() },
+504 CLOSE 6                                 onToggleNotifications = { viewModel.toggleNotifications() },
+505 OPEN 6                                 onToggleMorningAthkar = { viewModel.toggleMorningAthkarNotify() },
+505 CLOSE 6                                 onToggleMorningAthkar = { viewModel.toggleMorningAthkarNotify() },
+506 OPEN 6                                 onToggleEveningAthkar = { viewModel.toggleEveningAthkarNotify() },
+506 CLOSE 6                                 onToggleEveningAthkar = { viewModel.toggleEveningAthkarNotify() },
+507 OPEN 6                                 onToggleSleepAthkar = { viewModel.toggleSleepAthkarNotify() },
+507 CLOSE 6                                 onToggleSleepAthkar = { viewModel.toggleSleepAthkarNotify() },
+508 OPEN 6                                 onMethodSelected = { viewModel.selectMethod(it) },
+508 CLOSE 6                                 onMethodSelected = { viewModel.selectMethod(it) },
+509 OPEN 6                                 onSetCustomLocation = { lat, lon, name -> viewModel.setCustomLocation(lat, lon, name) },
+509 CLOSE 6                                 onSetCustomLocation = { lat, lon, name -> viewModel.setCustomLocation(lat, lon, name) },
+510 OPEN 6                                 onResetAll = { viewModel.resetAllData() },
+510 CLOSE 6                                 onResetAll = { viewModel.resetAllData() },
+511 OPEN 6                                 onSelectMuezzin = { viewModel.selectMuezzin(it) }
+511 CLOSE 6                                 onSelectMuezzin = { viewModel.selectMuezzin(it) }
+513 CLOSE 5                         }
+514 CLOSE 4                     }
+515 CLOSE 3                 }
+518 OPEN 3                 if (activeAdhanName != null) {
+523 OPEN 4                             .clickable(enabled = false) {},
+523 CLOSE 4                             .clickable(enabled = false) {},
+525 OPEN 4                     ) {
+530 OPEN 5                         ) {
+533 OPEN 6                             ) {
+555 OPEN 7                                     text = "حسب التوقيت المحلي لمدينة ${AthkarData.presetCities.find { it.key == uiState.selectedCityKey }?.name ?: ""}",
+555 OPEN 8                                     text = "حسب التوقيت المحلي لمدينة ${AthkarData.presetCities.find { it.key == uiState.selectedCityKey }?.name ?: ""}",
+555 CLOSE 8                                     text = "حسب التوقيت المحلي لمدينة ${AthkarData.presetCities.find { it.key == uiState.selectedCityKey }?.name ?: ""}",
+555 CLOSE 7                                     text = "حسب التوقيت المحلي لمدينة ${AthkarData.presetCities.find { it.key == uiState.selectedCityKey }?.name ?: ""}",
+565 OPEN 7                                     text = "بصوت: ${currentMuezzin.name}",
+565 CLOSE 7                                     text = "بصوت: ${currentMuezzin.name}",
+574 OPEN 7                                     onClick = { viewModel.stopAdhan() },
+574 CLOSE 7                                     onClick = { viewModel.stopAdhan() },
+583 OPEN 7                                 ) {
+589 CLOSE 7                                 }
+590 CLOSE 6                             }
+591 CLOSE 5                         }
+592 CLOSE 4                     }
+594 CLOSE 3                 }
+597 OPEN 3                 if (uiState.showPrivacyGate) {
+601 OPEN 4                         onAccept = {
+603 CLOSE 4                         },
+604 OPEN 4                         onDecline = {
+606 CLOSE 4                         }
+608 CLOSE 3                 }
+609 CLOSE 2             }
+610 CLOSE 1         }
+611 CLOSE 0     }
+612 CLOSE -1 }

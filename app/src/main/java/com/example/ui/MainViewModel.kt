@@ -23,6 +23,12 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+data class AthkarNotificationInfo(
+    val categoryId: String,
+    val title: String,
+    val body: String
+)
+
 data class AthkarUiState(
     val activeCategory: String = "morning",
     val remainingCounts: Map<String, Map<String, Int>> = emptyMap(),
@@ -31,7 +37,7 @@ data class AthkarUiState(
     // Privacy Gate State
     val showPrivacyGate: Boolean = false,
     val privacyChecking: Boolean = true,
-    val privacyVersion: String = "2026-08-08",
+    val privacyVersion: String = "2.2.3",
     val privacyPolicyUrl: String = "https://zaidmtsmbanihani.blogspot.com/2026/08/blog-post.html",
     val acceptedPrivacyVersion: String? = null,
     
@@ -43,7 +49,7 @@ data class AthkarUiState(
     
     // Prayer
     val selectedCityKey: String = "mecca",
-    val selectedMethodKey: String = "umm_alqura",
+    val selectedMethodKey: String = "auto",
     val customLocation: CustomLocation? = null,
     val prayerTimes: PrayerTimes = PrayerTimes(),
     val nextPrayerName: String = "--",
@@ -68,8 +74,16 @@ data class AthkarUiState(
     // Settings
     val soundEnabled: Boolean = true,
     val notificationsEnabled: Boolean = true,
-    val selectedMuezzinId: String = "mishaari",
-    val activeAdhanPrayerName: String? = null
+    val morningAthkarNotify: Boolean = true,
+    val eveningAthkarNotify: Boolean = true,
+    val sleepAthkarNotify: Boolean = true,
+    val selectedMuezzinId: String = "minshawi",
+    val activeAdhanPrayerName: String? = null,
+    val activeAthkarNotification: AthkarNotificationInfo? = null,
+    val mutedPrayers: Set<String> = emptySet(),
+    val exactAlarmsAllowed: Boolean = true,
+    val isBatteryOptimized: Boolean = false,
+    val activeBroadcast: com.example.data.BroadcastMessage? = null
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -91,10 +105,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value.convertDay
         )
         startPrayerCountdownTimer()
+        startBroadcastListener()
+        val exactAllowed = com.example.service.AdhanAlarmScheduler.scheduleAllAlarms(getApplication())
+        _uiState.value = _uiState.value.copy(exactAlarmsAllowed = exactAllowed)
     }
 
     private fun loadSavedState() {
         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        val lastAppDate = prefs.getString("last_app_date", null)
+
+        if (lastAppDate != null && lastAppDate != todayStr) {
+            val editor = prefs.edit()
+            AthkarData.categories.forEach { cat ->
+                val dhikrs = AthkarData.getDhikrsForCategory(cat.id)
+                dhikrs.forEach { d ->
+                    editor.remove("count_${cat.id}_${d.id}")
+                }
+                editor.remove("completed_date_${cat.id}")
+            }
+            editor.putString("last_app_date", todayStr)
+            editor.apply()
+        } else if (lastAppDate == null) {
+            prefs.edit().putString("last_app_date", todayStr).apply()
+        }
 
         val initialCounts = mutableMapOf<String, MutableMap<String, Int>>()
         val completedDatesMap = mutableMapOf<String, String>()
@@ -123,70 +156,104 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // Settings & Tasbih
         val savedCityKey = prefs.getString("selected_city", "mecca") ?: "mecca"
-        val savedMethodKey = prefs.getString("selected_method", "umm_alqura") ?: "umm_alqura"
-        val savedMuezzinId = prefs.getString("selected_muezzin", "mishaari") ?: "mishaari"
+        val savedMethodKey = prefs.getString("selected_method", "auto") ?: "auto"
+        val savedMuezzinId = prefs.getString("selected_muezzin", "minshawi") ?: "minshawi"
         val savedSound = prefs.getBoolean("sound_enabled", true)
         val savedNotifs = prefs.getBoolean("notifs_enabled", true)
+        val savedMorningNotify = prefs.getBoolean("morning_athkar_notify", true)
+        val savedEveningNotify = prefs.getBoolean("evening_athkar_notify", true)
+        val savedSleepNotify = prefs.getBoolean("sleep_athkar_notify", true)
         val savedTasbihIdx = prefs.getInt("tasbih_index", 0)
         val savedTasbihCount = prefs.getInt("tasbih_count", 0)
         val savedTasbihSession = prefs.getInt("tasbih_session", 0)
         val savedTasbihTotal = prefs.getInt("tasbih_total", 0)
 
         val savedAcceptedPrivacy = prefs.getString("accepted_privacy_version", null)
+        val hasAcceptedPrivacy = prefs.getBoolean("privacy_accepted", false) || savedAcceptedPrivacy != null
+        val currentAppVersion = "2.2.3"
+
+        val mutedSet = mutableSetOf<String>()
+        val prayerKeys = listOf("fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha")
+        for (key in prayerKeys) {
+            if (prefs.getBoolean("prayer_muted_$key", false)) {
+                mutedSet.add(key)
+            }
+        }
 
         _uiState.value = _uiState.value.copy(
             remainingCounts = initialCounts,
             completedDates = completedDatesMap,
             acceptedPrivacyVersion = savedAcceptedPrivacy,
-            showPrivacyGate = (savedAcceptedPrivacy == null),
+            privacyVersion = currentAppVersion,
+            showPrivacyGate = !hasAcceptedPrivacy,
             selectedCityKey = savedCityKey,
             selectedMethodKey = savedMethodKey,
             selectedMuezzinId = savedMuezzinId,
             soundEnabled = savedSound,
             notificationsEnabled = savedNotifs,
+            morningAthkarNotify = savedMorningNotify,
+            eveningAthkarNotify = savedEveningNotify,
+            sleepAthkarNotify = savedSleepNotify,
             activeTasbihIndex = savedTasbihIdx,
             currentTasbihCount = savedTasbihCount,
             tasbihSession = savedTasbihSession,
-            tasbihTotal = savedTasbihTotal
+            tasbihTotal = savedTasbihTotal,
+            mutedPrayers = mutedSet
         )
     }
 
+    private var tasbihSaveJob: kotlinx.coroutines.Job? = null
+
     private fun saveAthkarProgress(categoryId: String) {
-        val editor = prefs.edit()
-        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-        editor.putString("last_app_date", todayStr)
-
         val catMap = _uiState.value.remainingCounts[categoryId] ?: emptyMap()
-        catMap.forEach { (dhikrId, count) ->
-            editor.putInt("count_${categoryId}_$dhikrId", count)
-        }
-
         val compDate = _uiState.value.completedDates[categoryId]
-        if (compDate != null) {
-            editor.putString("completed_date_$categoryId", compDate)
-        } else {
-            editor.remove("completed_date_$categoryId")
+        viewModelScope.launch(Dispatchers.IO) {
+            val editor = prefs.edit()
+            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+            editor.putString("last_app_date", todayStr)
+
+            catMap.forEach { (dhikrId, count) ->
+                editor.putInt("count_${categoryId}_$dhikrId", count)
+            }
+
+            if (compDate != null) {
+                editor.putString("completed_date_$categoryId", compDate)
+            } else {
+                editor.remove("completed_date_$categoryId")
+            }
+            editor.apply()
         }
-        editor.apply()
     }
 
     private fun saveTasbihState() {
-        prefs.edit()
-            .putInt("tasbih_index", _uiState.value.activeTasbihIndex)
-            .putInt("tasbih_count", _uiState.value.currentTasbihCount)
-            .putInt("tasbih_session", _uiState.value.tasbihSession)
-            .putInt("tasbih_total", _uiState.value.tasbihTotal)
-            .apply()
+        tasbihSaveJob?.cancel()
+        tasbihSaveJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(150) // Debounce rapid taps so consecutive clicks remain butter-smooth
+            val state = _uiState.value
+            prefs.edit()
+                .putInt("tasbih_index", state.activeTasbihIndex)
+                .putInt("tasbih_count", state.currentTasbihCount)
+                .putInt("tasbih_session", state.tasbihSession)
+                .putInt("tasbih_total", state.tasbihTotal)
+                .apply()
+        }
     }
 
     private fun saveSettingsState() {
-        prefs.edit()
-            .putString("selected_city", _uiState.value.selectedCityKey)
-            .putString("selected_method", _uiState.value.selectedMethodKey)
-            .putString("selected_muezzin", _uiState.value.selectedMuezzinId)
-            .putBoolean("sound_enabled", _uiState.value.soundEnabled)
-            .putBoolean("notifs_enabled", _uiState.value.notificationsEnabled)
-            .apply()
+        viewModelScope.launch(Dispatchers.IO) {
+            prefs.edit()
+                .putString("selected_city", _uiState.value.selectedCityKey)
+                .putString("selected_method", _uiState.value.selectedMethodKey)
+                .putString("selected_muezzin", _uiState.value.selectedMuezzinId)
+                .putBoolean("sound_enabled", _uiState.value.soundEnabled)
+                .putBoolean("notifs_enabled", _uiState.value.notificationsEnabled)
+                .putBoolean("morning_athkar_notify", _uiState.value.morningAthkarNotify)
+                .putBoolean("evening_athkar_notify", _uiState.value.eveningAthkarNotify)
+                .putBoolean("sleep_athkar_notify", _uiState.value.sleepAthkarNotify)
+                .apply()
+        }
+        val exactAllowed = com.example.service.AdhanAlarmScheduler.scheduleAllAlarms(getApplication())
+        _uiState.value = _uiState.value.copy(exactAlarmsAllowed = exactAllowed)
     }
 
     fun selectCategory(catId: String) {
@@ -293,8 +360,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Prayer
     fun selectCity(cityKey: String) {
+        val city = AthkarData.presetCities.find { it.key == cityKey }
         _uiState.value = _uiState.value.copy(
             selectedCityKey = cityKey,
+            selectedMethodKey = city?.method ?: _uiState.value.selectedMethodKey,
             customLocation = null
         )
         recalculatePrayerTimes()
@@ -429,30 +498,107 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val maxIntervalSecs = if (intervalSecs > 0f) intervalSecs else 6 * 3600f
         val progress = (1.0f - (diffSecs.toFloat() / maxIntervalSecs)).coerceIn(0f, 1f)
 
+        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        val lastAppDate = prefs.getString("last_app_date", null)
+        if (lastAppDate != todayStr) {
+            loadSavedState()
+        }
+
         val countdownStr = String.format("متبقي %02d:%02d", hrs, mns)
 
         var triggerAdhanName: String? = _uiState.value.activeAdhanPrayerName
-        if (diffSecs == 0) {
-            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-            val triggerKey = "${nextPrayer.key}-$todayStr"
-            if (lastTriggeredAdhanKey != triggerKey) {
-                lastTriggeredAdhanKey = triggerKey
-                if (_uiState.value.notificationsEnabled) {
-                    triggerAdhanName = nextPrayer.name
+        for (p in prayers) {
+            if (p.key != "sunrise") {
+                val triggerKey = "${p.key}-$todayStr"
+                if (lastTriggeredAdhanKey != triggerKey) {
+                    val timeDiff = currentMins - p.mins
+                    if (timeDiff in 0..1) {
+                        lastTriggeredAdhanKey = triggerKey
+                        if (_uiState.value.notificationsEnabled) {
+                            triggerAdhanName = p.name
+                        }
+                        break
+                    }
                 }
             }
         }
 
-        _uiState.value = _uiState.value.copy(
-            nextPrayerName = nextPrayer.name,
-            nextPrayerKey = nextPrayer.key,
-            countdownText = countdownStr,
-            countdownHours = hrs,
-            countdownMinutes = mns,
-            countdownSeconds = scs,
-            countdownProgress = progress,
-            activeAdhanPrayerName = triggerAdhanName
-        )
+        var triggerAthkarNotif: AthkarNotificationInfo? = _uiState.value.activeAthkarNotification
+        if (_uiState.value.notificationsEnabled && triggerAthkarNotif == null) {
+            val currentHour = now.get(Calendar.HOUR_OF_DAY)
+            val currentMin = now.get(Calendar.MINUTE)
+
+            val isMorningCompleted = _uiState.value.completedDates["morning"] == todayStr
+            val isEveningCompleted = _uiState.value.completedDates["evening"] == todayStr
+            val isSleepCompleted = _uiState.value.completedDates["sleep"] == todayStr
+
+            // Morning Athkar (Starts at 2:00 PM / 14:00, hourly reminders until completed)
+            if (_uiState.value.morningAthkarNotify && !isMorningCompleted) {
+                if (currentHour in 14..16) {
+                    val notifHourKey = "last_morning_notif_hour_$todayStr"
+                    if (prefs.getInt(notifHourKey, -1) != currentHour && currentMin in 0..5) {
+                        prefs.edit().putInt(notifHourKey, currentHour).apply()
+                        triggerAthkarNotif = AthkarNotificationInfo(
+                            categoryId = "morning",
+                            title = "تذكير أذكار الصباح",
+                            body = "أصبحنا وأصبح الملك لله.. لا تنسَ قراءة أذكار الصباح لبداية يومك المبارك"
+                        )
+                    }
+                }
+            }
+
+            // Evening Athkar (Starts at 5:00 PM / 17:00, hourly reminders until completed)
+            if (_uiState.value.eveningAthkarNotify && !isEveningCompleted && triggerAthkarNotif == null) {
+                if (currentHour in 17..21) {
+                    val notifHourKey = "last_evening_notif_hour_$todayStr"
+                    if (prefs.getInt(notifHourKey, -1) != currentHour && currentMin in 0..5) {
+                        prefs.edit().putInt(notifHourKey, currentHour).apply()
+                        triggerAthkarNotif = AthkarNotificationInfo(
+                            categoryId = "evening",
+                            title = "تذكير أذكار المساء",
+                            body = "أمسينَا وأمسَى الملك لله.. حان وقت أذكار المساء وحصنك الحصين"
+                        )
+                    }
+                }
+            }
+
+            // Sleep Athkar (Starts at 10:00 PM / 22:00, hourly reminders until completed)
+            if (_uiState.value.sleepAthkarNotify && !isSleepCompleted && triggerAthkarNotif == null) {
+                if (currentHour >= 22 || currentHour < 2) {
+                    val notifHourKey = "last_sleep_notif_hour_$todayStr"
+                    if (prefs.getInt(notifHourKey, -1) != currentHour && currentMin in 0..5) {
+                        prefs.edit().putInt(notifHourKey, currentHour).apply()
+                        triggerAthkarNotif = AthkarNotificationInfo(
+                            categoryId = "sleep",
+                            title = "تذكير أذكار النوم",
+                            body = "باسمك ربي وضعت جنبي وبك أرفعه.. قراءة أذكار النوم قبل الخلود للراحة"
+                        )
+                    }
+                }
+            }
+        }
+
+        val current = _uiState.value
+        val hasSignificantChange = current.nextPrayerName != nextPrayer.name ||
+                current.countdownHours != hrs ||
+                current.countdownMinutes != mns ||
+                current.activeAdhanPrayerName != triggerAdhanName ||
+                current.activeAthkarNotification != triggerAthkarNotif ||
+                kotlin.math.abs(current.countdownProgress - progress) > 0.02f
+
+        if (hasSignificantChange) {
+            _uiState.value = current.copy(
+                nextPrayerName = nextPrayer.name,
+                nextPrayerKey = nextPrayer.key,
+                countdownText = countdownStr,
+                countdownHours = hrs,
+                countdownMinutes = mns,
+                countdownSeconds = scs,
+                countdownProgress = progress,
+                activeAdhanPrayerName = triggerAdhanName,
+                activeAthkarNotification = triggerAthkarNotif
+            )
+        }
     }
 
     // Fortress
@@ -482,6 +628,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         saveSettingsState()
     }
 
+    fun toggleMorningAthkarNotify() {
+        _uiState.value = _uiState.value.copy(morningAthkarNotify = !_uiState.value.morningAthkarNotify)
+        saveSettingsState()
+    }
+
+    fun toggleEveningAthkarNotify() {
+        _uiState.value = _uiState.value.copy(eveningAthkarNotify = !_uiState.value.eveningAthkarNotify)
+        saveSettingsState()
+    }
+
+    fun toggleSleepAthkarNotify() {
+        _uiState.value = _uiState.value.copy(sleepAthkarNotify = !_uiState.value.sleepAthkarNotify)
+        saveSettingsState()
+    }
+
+    fun clearAthkarNotification() {
+        _uiState.value = _uiState.value.copy(activeAthkarNotification = null)
+    }
+
     fun selectMuezzin(muezzinId: String) {
         _uiState.value = _uiState.value.copy(selectedMuezzinId = muezzinId)
         saveSettingsState()
@@ -497,15 +662,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loadSavedState()
         checkPrivacyPolicyVersion()
         recalculatePrayerTimes()
+        val exactAllowed = com.example.service.AdhanAlarmScheduler.scheduleAllAlarms(getApplication())
+        _uiState.value = _uiState.value.copy(exactAlarmsAllowed = exactAllowed)
+    }
+
+    fun togglePrayerMute(prayerKey: String) {
+        val currentMuted = _uiState.value.mutedPrayers.toMutableSet()
+        val isNowMuted = if (currentMuted.contains(prayerKey)) {
+            currentMuted.remove(prayerKey)
+            false
+        } else {
+            currentMuted.add(prayerKey)
+            true
+        }
+        prefs.edit().putBoolean("prayer_muted_$prayerKey", isNowMuted).apply()
+        
+        val exactAllowed = com.example.service.AdhanAlarmScheduler.scheduleAllAlarms(getApplication())
+        _uiState.value = _uiState.value.copy(mutedPrayers = currentMuted, exactAlarmsAllowed = exactAllowed)
     }
 
     // Privacy Policy Consent Gate
     fun checkPrivacyPolicyVersion() {
         val acceptedVer = prefs.getString("accepted_privacy_version", null)
-        _uiState.value = _uiState.value.copy(acceptedPrivacyVersion = acceptedVer)
+        val hasAccepted = prefs.getBoolean("privacy_accepted", false) || acceptedVer != null
+        val currentAppVersion = "2.2.3"
+        _uiState.value = _uiState.value.copy(
+            acceptedPrivacyVersion = acceptedVer,
+            showPrivacyGate = !hasAccepted
+        )
 
         viewModelScope.launch(Dispatchers.IO) {
-            var remoteVersion = "2026-08-08"
+            var remoteVersion = currentAppVersion
             var remoteUrl = "https://zaidmtsmbanihani.blogspot.com/2026/08/blog-post.html"
 
             try {
@@ -527,13 +714,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 conn.disconnect()
             } catch (e: Exception) {
-                // If network fetch fails and user has already accepted a local version, keep offline user unblocked
-                if (acceptedVer != null) {
-                    remoteVersion = acceptedVer
-                }
+                // Keep default remoteVersion
             }
 
-            val needsConsent = acceptedVer == null || acceptedVer != remoteVersion
+            val needsConsent = !hasAccepted
 
             withContext(Dispatchers.Main) {
                 _uiState.value = _uiState.value.copy(
@@ -549,6 +733,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun acceptPrivacyPolicy() {
         val ver = _uiState.value.privacyVersion
         prefs.edit()
+            .putBoolean("privacy_accepted", true)
             .putString("accepted_privacy_version", ver)
             .putLong("accepted_privacy_timestamp", System.currentTimeMillis())
             .apply()
@@ -557,5 +742,72 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             showPrivacyGate = false,
             acceptedPrivacyVersion = ver
         )
+    }
+
+    fun checkSystemPermissions() {
+        var exactAllowed = true
+        var batteryOptimized = false
+        
+        val context = getApplication<Application>()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            exactAllowed = alarmManager.canScheduleExactAlarms()
+        }
+        
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        if (powerManager != null) {
+            batteryOptimized = !powerManager.isIgnoringBatteryOptimizations(context.packageName)
+        }
+        
+        _uiState.value = _uiState.value.copy(
+            exactAlarmsAllowed = exactAllowed,
+            isBatteryOptimized = batteryOptimized
+        )
+    }
+
+    // Firebase Realtime Broadcast
+    private fun startBroadcastListener() {
+        viewModelScope.launch {
+            while (true) {
+                try {
+                    val broadcast = com.example.data.FirebaseBroadcastManager.fetchCurrentBroadcast(getApplication())
+                    if (broadcast != null && broadcast.text.isNotBlank()) {
+                        if (!com.example.data.FirebaseBroadcastManager.isDismissed(getApplication(), broadcast.id)) {
+                            _uiState.value = _uiState.value.copy(activeBroadcast = broadcast)
+                        }
+                    }
+                } catch (_: Exception) {}
+                delay(15000) // Poll real time every 15 seconds
+            }
+        }
+    }
+
+    fun dismissBroadcast(messageId: String) {
+        com.example.data.FirebaseBroadcastManager.dismissMessage(getApplication(), messageId)
+        _uiState.value = _uiState.value.copy(activeBroadcast = null)
+    }
+
+    fun sendBroadcastMessage(
+        text: String,
+        customUrl: String? = null,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val result = com.example.data.FirebaseBroadcastManager.sendBroadcast(
+                    context = getApplication(),
+                    text = text,
+                    customUrl = customUrl
+                )
+                if (result.isSuccess) {
+                    val msg = result.getOrNull()
+                    onResult(true, "تم إرسال الرسالة بنجاح وحفظها في Firebase Realtime")
+                } else {
+                    onResult(false, result.exceptionOrNull()?.message ?: "فشل في الإرسال")
+                }
+            } catch (e: Exception) {
+                onResult(false, e.message ?: "حدث خطأ غير متوقع")
+            }
+        }
     }
 }

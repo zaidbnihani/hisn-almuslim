@@ -1,16 +1,19 @@
 package com.example.ui.screens
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExitToApp
@@ -74,6 +77,11 @@ fun PrivacyConsentScreen(
         onDecline()
     }
 
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -83,175 +91,205 @@ fun PrivacyConsentScreen(
             .padding(20.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(26.dp))
-                .background(CardSurface)
-                .border(
-                    1.5.dp,
-                    Brush.verticalGradient(
-                        listOf(AccentEmerald, GoldPrimary.copy(alpha = 0.3f), CardBorder)
-                    ),
-                    RoundedCornerShape(26.dp)
-                )
-                .padding(22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(animationSpec = tween(350)) + scaleIn(initialScale = 0.88f, animationSpec = tween(350)),
+            exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.9f, animationSpec = tween(200))
         ) {
-            // Small Header Title: سياسة الخصوصية
-            Text(
-                text = "سياسة الخصوصية",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = AccentEmeraldLight,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "الموافقة على الشروط وأحكام الاستخدام",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "إصدار $versionString",
-                fontSize = 11.sp,
-                color = TextSecondary
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Scrollable Summary Box
-            val scrollState = rememberScrollState()
             Column(
                 modifier = Modifier
-                    .weight(1f, fill = false)
-                    .verticalScroll(scrollState)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(CardSurfaceVariant.copy(alpha = 0.6f))
-                    .border(0.5.dp, CardBorder, RoundedCornerShape(16.dp))
-                    .padding(14.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(CardSurface)
+                    .border(
+                        1.5.dp,
+                        Brush.verticalGradient(
+                            listOf(AccentEmerald.copy(alpha = 0.8f), GoldPrimary.copy(alpha = 0.2f), CardBorder)
+                        ),
+                        RoundedCornerShape(28.dp)
+                    )
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                PrivacyPointItem(
-                    icon = Icons.Default.Lock,
-                    title = "حفظ البيانات والخصوصية",
-                    desc = "جميع أذكارك وإنجازاتك تُحفظ محلياً على جهازك فقط لضمان الخصوصية والسرعة."
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                PrivacyPointItem(
-                    icon = Icons.Default.Info,
-                    title = "مواقيت الصلاة والموقع",
-                    desc = "يُستخدم موقعك الجغرافي لحساب أوقات الصلاة والقبلة بدقة متناهية دون مشاركته مع أي طرف خارجي."
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Link at the bottom: اقرأها كاملاً
-                Surface(
+                // Beautiful top shield badge
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .size(56.dp)
                         .clip(CircleShape)
-                        .clickable {
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(policyUrl))
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                // Ignore if browser unavailable
-                            }
-                        }
-                        .testTag("btn_read_full_privacy"),
-                    color = AccentEmerald.copy(alpha = 0.12f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmeraldLight)
+                        .background(AccentEmerald.copy(alpha = 0.15f))
+                        .border(1.dp, AccentEmerald.copy(alpha = 0.4f), CircleShape),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
+                    Icon(
+                        imageVector = ShieldIconVector,
+                        contentDescription = null,
+                        tint = AccentEmeraldLight,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Small Header Title: سياسة الخصوصية
+                Text(
+                    text = "حماية وخصوصية البيانات",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AccentEmeraldLight,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "شروط وأحكام الاستخدام",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                    color = TextPrimary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "الإصدار $versionString",
+                    fontSize = 11.sp,
+                    color = TextSecondary,
+                    fontWeight = FontWeight.Medium
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Scrollable Summary Box
+                val scrollState = rememberScrollState()
+                Column(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(scrollState)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(CardSurfaceVariant.copy(alpha = 0.6f))
+                        .border(0.5.dp, CardBorder, RoundedCornerShape(20.dp))
+                        .padding(16.dp)
+                ) {
+                    PrivacyPointItem(
+                        icon = Icons.Default.Lock,
+                        title = "حفظ البيانات والخصوصية",
+                        desc = "جميع أذكارك وإنجازاتك تُحفظ محلياً على جهازك فقط لضمان الخصوصية التامة والسرعة الفائقة."
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    PrivacyPointItem(
+                        icon = Icons.Default.Info,
+                        title = "مواقيت الصلاة والموقع",
+                        desc = "يُستخدم موقعك الجغرافي لحساب أوقات الصلاة والقبلة بدقة متناهية دون مشاركته مع أي طرف خارجي على الإطلاق."
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Link at the bottom: اقرأها كاملاً
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                            .clip(CircleShape)
+                            .clickable {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(policyUrl))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    // Ignore if browser unavailable
+                                }
+                            }
+                            .testTag("btn_read_full_privacy"),
+                        color = AccentEmerald.copy(alpha = 0.12f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentEmeraldLight.copy(alpha = 0.6f))
                     ) {
-                        Icon(
-                            imageVector = OpenLinkIconVector,
-                            contentDescription = null,
-                            tint = AccentEmeraldLight,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "اقرأها كاملاً",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AccentEmeraldLight
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = OpenLinkIconVector,
+                                contentDescription = null,
+                                tint = AccentEmeraldLight,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "اقرأ وثيقة الخصوصية كاملة",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AccentEmeraldLight
+                            )
+                        }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-            // Action Buttons: Green Accept & Decline
-            Button(
-                onClick = onAccept,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-                    .testTag("btn_accept_privacy"),
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AccentEmerald,
-                    contentColor = Color.White
-                )
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = Color.White
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "موافق",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
+                // Action Buttons: Side-by-side in a beautifully centered Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .align(Alignment.CenterHorizontally),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Decline button: "لا" (smaller, outline style)
+                    OutlinedButton(
+                        onClick = onDecline,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .testTag("btn_decline_privacy"),
+                        shape = RoundedCornerShape(14.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF6B6B).copy(alpha = 0.7f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFFFF6B6B)
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Text(
+                            text = "لا",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            OutlinedButton(
-                onClick = onDecline,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp)
-                    .testTag("btn_decline_privacy"),
-                shape = CircleShape,
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF6B6B)),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = Color(0xFFFF6B6B)
-                )
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.ExitToApp,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "لا (إغلاق التطبيق)",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    // Accept button: "موافق" (smaller, centered green style)
+                    Button(
+                        onClick = onAccept,
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .height(44.dp)
+                            .testTag("btn_accept_privacy"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AccentEmerald,
+                            contentColor = Color.White
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "موافق",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }

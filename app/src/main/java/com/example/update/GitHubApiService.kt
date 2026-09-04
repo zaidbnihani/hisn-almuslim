@@ -1,0 +1,15 @@
+package com.example.update
+
+import retrofit2.Response
+import retrofit2.http.GET
+import retrofit2.http.Headers
+import retrofit2.http.Path
+
+interface GitHubApiService {
+    @Headers("User-Agent: Athkar-Android-App")
+    @GET("repos/{owner}/{repo}/releases/latest")
+    suspend fun getLatestRelease(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String
+    ): Response<GitHubRelease>
+}

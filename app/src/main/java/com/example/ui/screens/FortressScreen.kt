@@ -1,4 +1,6 @@
 package com.example.ui.screens
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -35,6 +39,7 @@ fun FortressScreen(
     uiState: AthkarUiState,
     onQueryChanged: (String) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     var selectedCategory by remember { mutableStateOf("الكل") }
     var selectedItem by remember { mutableStateOf<FortressItem?>(null) }
 
@@ -117,7 +122,10 @@ fun FortressScreen(
                     val isSelected = (cat == selectedCategory)
                     FilterChip(
                         selected = isSelected,
-                        onClick = { selectedCategory = cat },
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            selectedCategory = cat
+                        },
                         label = {
                             Text(
                                 text = cat,
@@ -156,7 +164,10 @@ fun FortressScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(130.dp)
-                            .clickable { selectedItem = item }
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                selectedItem = item
+                            }
                             .testTag("fortress_item_${item.id}"),
                         shape = RoundedCornerShape(24.dp),
                         colors = CardDefaults.cardColors(containerColor = CardSurface),
@@ -203,75 +214,91 @@ fun FortressScreen(
             }
         }
 
-        // Dua Detail Sheet
+        // Dua Detail Dialog
         if (selectedItem != null) {
             val item = selectedItem!!
-            ModalBottomSheet(
-                onDismissRequest = { selectedItem = null },
-                containerColor = CardSurface,
-                scrimColor = Color.Black.copy(alpha = 0.6f)
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { selectedItem = null }
             ) {
-                Column(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(horizontal = 8.dp, vertical = 24.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardSurface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
                 ) {
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = GoldBright,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = CardSurfaceVariant),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp)
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = GoldBright,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = CardSurfaceVariant),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
                         ) {
-                            Text(
-                                text = item.text,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = TextPrimary,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 32.sp
-                            )
+                            Column(
+                                modifier = Modifier.padding(20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = item.text,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = TextPrimary,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 32.sp
+                                )
 
-                            if (item.note.isNotEmpty() || item.source.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Divider(color = CardBorder)
-                                Spacer(modifier = Modifier.height(16.dp))
+                                if (item.note.isNotEmpty() || item.source.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Divider(color = CardBorder)
+                                    Spacer(modifier = Modifier.height(16.dp))
 
-                                if (item.note.isNotEmpty()) {
-                                    Text(
-                                        text = item.note,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = TextSecondary,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
+                                    if (item.note.isNotEmpty()) {
+                                        Text(
+                                            text = item.note,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = TextSecondary,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
 
-                                if (item.source.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = item.source,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = GoldMuted,
-                                        textAlign = TextAlign.Center
-                                    )
+                                    if (item.source.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = item.source,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = GoldMuted,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Button(
+                            onClick = { selectedItem = null },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary)
+                        ) {
+                            Text("إغلاق", color = DarkCanvas, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }
